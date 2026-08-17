@@ -112,7 +112,7 @@ export default function DashboardClient({ scholars, top3, kpi, scholarCount, ben
           <Image
             src="/wahome-logo.png"
             alt="Wahome Foundation"
-            width={400}
+            width={210}
             height={120}
             priority
             className="object-contain"
