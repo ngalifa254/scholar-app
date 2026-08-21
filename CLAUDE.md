@@ -1,4 +1,4 @@
-# Scholar Pulse - Project Rules
+# Student Center - Project Rules
 
 ## Tech Stack
 - Next.js 14+ (App Router)
@@ -8,7 +8,7 @@
 - Deployment: Vercel (scholars.wahomefoundation.com)
 
 ## Project Context
-Scholar Pulse is the Wahome Foundation's scholarship platform. It consists of:
+Student Center is the Wahome Foundation's scholarship platform. It consists of:
 1. **Public Pages:** An "Our Scholars" showcase matching the main site branding (www.wahomefoundation.com).
 2. **Staff Dashboard:** Login-protected interface to upload a Grade 9 applicant CSV, score them on four criteria, generate AI narrative reviews, and export results.
 

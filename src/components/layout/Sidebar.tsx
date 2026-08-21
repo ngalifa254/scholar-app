@@ -66,7 +66,7 @@ export function Sidebar() {
         <Image
           src="/wahome-logo.png"
           alt="Wahome Foundation"
-          width={79}
+          width={155}
           height={45}
           priority
           className="object-contain"
