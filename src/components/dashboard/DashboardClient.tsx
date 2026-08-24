@@ -1,22 +1,27 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
-  Users,
   ArrowRight,
   ChevronRight,
   GraduationCap,
   Award,
   FileText,
+  Search,
+  Clock,
+  UserPlus,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import {
   getScoreColor,
   formatDate,
+  cn,
 } from "@/lib/utils";
 import { ApplicantAvatar } from "@/components/ui/applicant-avatar";
 import type { Applicant, Scholar, ScholarStatus } from "@/types";
@@ -27,14 +32,8 @@ const SCHOLAR_STATUS: Record<ScholarStatus, { label: string; className: string }
   deferred:  { label: "Deferred",  className: "bg-amber-50 text-amber-700" },
 };
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 16 },
-  show: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.07, duration: 0.4 },
-  }),
-};
+const GLASS_CARD =
+  "rounded-2xl border-border/50 bg-card/80 backdrop-blur-md shadow-sm hover:shadow-lg transition-all";
 
 type KpiData = {
   totalApplicants: number;
@@ -55,71 +54,175 @@ interface Props {
   formsCount: number;
 }
 
-export default function DashboardClient({ scholars, top3, kpi, scholarCount, beneficiaryCount, formsCount }: Props) {
+function LiveClock() {
+  const [now, setNow] = useState<Date | null>(null);
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    const kickoff = setTimeout(() => setNow(new Date()), 0);
+    return () => {
+      clearInterval(id);
+      clearTimeout(kickoff);
+    };
+  }, []);
+
+  if (!now) {
+    return (
+      <div className="flex items-center gap-2 rounded-full bg-card/80 backdrop-blur-sm border border-border/60 px-4 py-2 shadow-sm shrink-0">
+        <Clock className="w-4 h-4 text-muted-foreground" />
+        <div className="text-right leading-tight">
+          <p className="text-sm font-semibold text-foreground">&nbsp;</p>
+          <p className="text-[11px] text-muted-foreground">&nbsp;</p>
+        </div>
+      </div>
+    );
+  }
+
+  const time = now.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+  const date = now.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
+
+  return (
+    <div className="flex items-center gap-2 rounded-full bg-card/80 backdrop-blur-sm border border-border/60 px-4 py-2 shadow-sm shrink-0">
+      <Clock className="w-4 h-4 text-primary" />
+      <div className="text-right leading-tight">
+        <p className="text-sm font-semibold text-foreground tabular-nums">{time}</p>
+        <p className="text-[11px] text-muted-foreground">{date}</p>
+      </div>
+    </div>
+  );
+}
+
+function MiniCalendar() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  const todayDate = today.getDate();
+
+  const firstWeekday = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthLabel = today.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+  const cells: (number | null)[] = [
+    ...Array(firstWeekday).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  return (
+    <Card className={GLASS_CARD}>
+      <div className="px-5 py-4 border-b border-border/60 flex items-center justify-between">
+        <h2 className="text-sm font-semibold">{monthLabel}</h2>
+        <div className="flex gap-1 rounded-full bg-muted/60 p-0.5">
+          {["Month", "Week", "Planner"].map((view) => (
+            <span
+              key={view}
+              className={cn(
+                "px-2.5 py-1 rounded-full text-[11px] font-medium",
+                view === "Month" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
+              )}
+            >
+              {view}
+            </span>
+          ))}
+        </div>
+      </div>
+      <CardContent className="p-4">
+        <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-medium text-muted-foreground mb-2">
+          {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+            <span key={i}>{d}</span>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {cells.map((day, i) => (
+            <div
+              key={i}
+              className={cn(
+                "aspect-square flex items-center justify-center text-xs rounded-full",
+                day === null && "invisible",
+                day === todayDate
+                  ? "bg-primary text-primary-foreground font-semibold"
+                  : "text-foreground hover:bg-muted/60"
+              )}
+            >
+              {day ?? 0}
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function DashboardClient({ scholars, top3, kpi }: Props) {
   const selectionRate = kpi.totalApplicants
     ? Math.round((kpi.selected / kpi.totalApplicants) * 100)
     : 0;
 
-  const OVERVIEW_CARDS = [
-    {
-      label: "Scholars",
-      value: scholarCount,
-      icon: GraduationCap,
-      iconBg: "bg-violet-50",
-      iconColor: "text-violet-600",
-      sub: "Current beneficiaries",
-      href: "/scholars",
-    },
-    {
-      label: "Past Beneficiaries",
-      value: beneficiaryCount,
-      icon: Award,
-      iconBg: "bg-amber-50",
-      iconColor: "text-amber-600",
-      sub: "University & career",
-      href: "/past-beneficiaries",
-    },
-    {
-      label: "Forms",
-      value: formsCount,
-      icon: FileText,
-      iconBg: "bg-blue-50",
-      iconColor: "text-blue-600",
-      sub: "Templates & documents",
-      href: "/forms",
-    },
-    {
-      label: "Scholarship Applicants",
-      value: kpi.totalApplicants,
-      icon: Users,
-      iconBg: "bg-emerald-50",
-      iconColor: "text-emerald-600",
-      sub: `${selectionRate}% selection rate`,
-      href: "/applicants",
-    },
+  const thankYouScholars = scholars.filter((s) => s.thankYouNote && s.thankYouNote.trim());
+
+  const recentActivity = [...scholars]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 3);
+
+  const QUICK_ACTIONS = [
+    { label: "Add Applicant", href: "/applicants/new", icon: UserPlus },
+    { label: "Add Scholar", href: "/scholars/new", icon: GraduationCap },
+    { label: "Add Beneficiary", href: "/past-beneficiaries/new", icon: Award },
+    { label: "New Form", href: "/forms", icon: FileText },
+  ];
+
+  const SELECTION_SUMMARY_ROWS: { label: string; count: number; textClassName: string; borderClassName: string }[] = [
+    { label: "Selected", count: kpi.selected, textClassName: "text-emerald-600", borderClassName: "border-emerald-500" },
+    { label: "Reviewed", count: kpi.reviewed, textClassName: "text-blue-600", borderClassName: "border-blue-500" },
+    { label: "Pending", count: kpi.pending, textClassName: "text-amber-600", borderClassName: "border-amber-500" },
+    { label: "Rejected", count: kpi.rejected, textClassName: "text-red-500", borderClassName: "border-red-500" },
   ];
 
   return (
-    <main className="flex-1 p-6 lg:p-8 space-y-8">
-      {/* Header */}
-      <div className="grid grid-cols-3 items-center">
-        <div />
-        <motion.div
-          className="flex justify-center"
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <Image
-            src="/wahome-logo.png"
-            alt="Wahome Foundation"
-            width={414}
-            height={120}
-            priority
-            className="object-contain"
+    <main className="relative flex-1 p-6 lg:p-8 space-y-8">
+      {/* Background blobs */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden -z-10">
+        <div className="absolute -top-24 -left-20 w-96 h-96 rounded-full bg-primary/15 blur-3xl" />
+        <div className="absolute -top-32 -right-24 w-96 h-96 rounded-full bg-accent-blue/10 blur-3xl" />
+        <div className="absolute bottom-0 left-1/3 w-80 h-80 rounded-full bg-primary/10 blur-3xl" />
+      </div>
+
+      {/* Top utility row */}
+      <motion.div
+        className="flex items-center justify-between gap-4"
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        <div className="relative w-full max-w-sm">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Search applicants, scholars, forms…"
+            className="rounded-full bg-card/80 backdrop-blur-sm border-border/60 pl-10 pr-4 shadow-sm"
           />
+        </div>
+        <LiveClock />
+      </motion.div>
+
+      {/* Greeting */}
+      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
+          <h1 className="font-serif text-3xl md:text-4xl font-bold text-foreground tracking-tight">
+            Hi Admin, welcome back!
+          </h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            {selectionRate}% selection rate across {kpi.totalApplicants} applicants
+          </p>
         </motion.div>
         <motion.div
-          className="flex justify-end"
           initial={{ opacity: 0, x: 8 }}
           animate={{ opacity: 1, x: 0, transition: { delay: 0.15 } }}
         >
@@ -132,27 +235,86 @@ export default function DashboardClient({ scholars, top3, kpi, scholarCount, ben
         </motion.div>
       </div>
 
-      {/* Overview Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {OVERVIEW_CARDS.map((card, i) => (
-          <motion.div key={card.label} custom={i} variants={fadeUp} initial="hidden" animate="show">
-            <Link href={card.href} className="block">
-              <Card className="hover:shadow-md hover:border-primary/30 transition-all cursor-pointer">
-                <CardContent className="p-5">
-                  <div className="flex items-start justify-between mb-3">
-                    <p className="text-xs font-medium text-muted-foreground">{card.label}</p>
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${card.iconBg}`}>
-                      <card.icon className={`w-4 h-4 ${card.iconColor}`} />
+      {/* Thank-You Notes wall */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0, transition: { delay: 0.1 } }}>
+        <Card className={GLASS_CARD}>
+          <div className="px-5 py-4 border-b border-border/60">
+            <h2 className="text-sm font-semibold">Thank-You Notes</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Messages from our scholars to their donors</p>
+            {recentActivity.length > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Recently added: {recentActivity.map((s) => `${s.firstName} ${s.lastName}`).join(", ")}
+              </p>
+            )}
+          </div>
+          <CardContent className="p-4">
+            {thankYouScholars.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                No thank-you notes yet.{" "}
+                <Link href="/scholars" className="text-primary underline">
+                  Add one from a scholar&apos;s profile.
+                </Link>
+              </p>
+            ) : (
+              <div className="flex gap-4 overflow-x-auto pb-1">
+                {thankYouScholars.map((s) => (
+                  <Link
+                    key={s.id}
+                    href={`/scholars/${s.id}`}
+                    className="shrink-0 w-56 rounded-xl border border-border/50 bg-card/60 overflow-hidden hover:border-primary/40 transition-colors"
+                  >
+                    <div className="relative w-full aspect-square bg-primary/10">
+                      {s.profilePhotoUrl ? (
+                        <Image
+                          src={s.profilePhotoUrl}
+                          alt={`${s.firstName} ${s.lastName}`}
+                          fill
+                          className="object-cover"
+                          sizes="224px"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-primary/40">
+                          <GraduationCap className="w-10 h-10" />
+                        </div>
+                      )}
                     </div>
-                  </div>
-                  <p className="text-2xl font-bold text-foreground tracking-tight">{card.value}</p>
-                  <p className="text-xs text-muted-foreground mt-1.5">{card.sub}</p>
-                </CardContent>
-              </Card>
+                    <div className="p-3">
+                      <p className="text-sm font-semibold truncate">
+                        {s.firstName} {s.lastName}
+                      </p>
+                      <p className="text-xs text-muted-foreground italic mt-1 line-clamp-3">
+                        &ldquo;{s.thankYouNote}&rdquo;
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Quick Actions — compact nav bar */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0, transition: { delay: 0.25 } }}
+      >
+        <nav
+          aria-label="Quick actions"
+          className="flex items-center gap-1 rounded-full bg-card/80 backdrop-blur-md border border-border/50 shadow-sm px-2 py-1.5 w-fit max-w-full overflow-x-auto divide-x divide-border/40"
+        >
+          {QUICK_ACTIONS.map((action) => (
+            <Link
+              key={action.label}
+              href={action.href}
+              className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors whitespace-nowrap"
+            >
+              <action.icon className="w-4 h-4" />
+              {action.label}
             </Link>
-          </motion.div>
-        ))}
-      </div>
+          ))}
+        </nav>
+      </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Scholars List */}
@@ -161,8 +323,8 @@ export default function DashboardClient({ scholars, top3, kpi, scholarCount, ben
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0, transition: { delay: 0.35 } }}
         >
-          <Card>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <Card className={GLASS_CARD}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border/60">
               <h2 className="text-sm font-semibold">Scholars</h2>
               <Button variant="ghost" size="sm" asChild>
                 <Link href="/scholars" className="flex items-center gap-1 text-xs">
@@ -204,7 +366,7 @@ export default function DashboardClient({ scholars, top3, kpi, scholarCount, ben
                             {st.label}
                           </span>
                         </Link>
-                        {i < Math.min(scholars.length, 6) - 1 && <div className="h-px bg-border mx-6" />}
+                        {i < Math.min(scholars.length, 6) - 1 && <div className="h-px bg-border/60 mx-6" />}
                       </li>
                     );
                   })}
@@ -221,8 +383,8 @@ export default function DashboardClient({ scholars, top3, kpi, scholarCount, ben
           animate={{ opacity: 1, y: 0, transition: { delay: 0.45 } }}
         >
           {/* Top 3 */}
-          <Card>
-            <div className="px-5 py-4 border-b border-border">
+          <Card className={GLASS_CARD}>
+            <div className="px-5 py-4 border-b border-border/60">
               <h2 className="text-sm font-semibold">Top Candidates</h2>
               <p className="text-xs text-muted-foreground mt-0.5">Highest scoring applicants</p>
             </div>
@@ -258,25 +420,23 @@ export default function DashboardClient({ scholars, top3, kpi, scholarCount, ben
           </Card>
 
           {/* Selection Summary */}
-          <Card>
-            <div className="px-5 py-4 border-b border-border">
+          <Card className={GLASS_CARD}>
+            <div className="px-5 py-4 border-b border-border/60">
               <h2 className="text-sm font-semibold">Selection Summary</h2>
             </div>
-            <CardContent className="p-5 space-y-3 text-sm">
-              {[
-                { label: "Selected", count: kpi.selected, color: "text-emerald-600" },
-                { label: "Reviewed", count: kpi.reviewed, color: "text-blue-600" },
-                { label: "Pending", count: kpi.pending, color: "text-amber-600" },
-                { label: "Rejected", count: kpi.rejected, color: "text-red-500" },
-              ].map((s) => (
-                <div key={s.label} className="flex justify-between items-center">
+            <CardContent className="p-5 space-y-2 text-sm">
+              {SELECTION_SUMMARY_ROWS.map((s) => (
+                <div
+                  key={s.label}
+                  className={`flex justify-between items-center border-l-4 ${s.borderClassName} bg-muted/30 rounded-r-lg pl-3 pr-3 py-2`}
+                >
                   <span className="text-muted-foreground">{s.label}</span>
-                  <span className={`font-semibold ${s.color}`}>{s.count}</span>
+                  <span className={`font-semibold ${s.textClassName}`}>{s.count}</span>
                 </div>
               ))}
               {kpi.lastApplicationDate && (
                 <>
-                  <div className="h-px bg-border" />
+                  <div className="h-px bg-border/60 !mt-3" />
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Last application</span>
                     <span className="font-medium">{formatDate(kpi.lastApplicationDate)}</span>
@@ -285,6 +445,9 @@ export default function DashboardClient({ scholars, top3, kpi, scholarCount, ben
               )}
             </CardContent>
           </Card>
+
+          {/* Mini Calendar */}
+          <MiniCalendar />
         </motion.div>
       </div>
 
@@ -293,8 +456,8 @@ export default function DashboardClient({ scholars, top3, kpi, scholarCount, ben
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0, transition: { delay: 0.55 } }}
       >
-        <Card>
-          <div className="px-6 py-4 border-b border-border">
+        <Card className={GLASS_CARD}>
+          <div className="px-6 py-4 border-b border-border/60">
             <h2 className="text-sm font-semibold">Application Status Distribution</h2>
           </div>
           <CardContent className="p-6">

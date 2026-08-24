@@ -12,9 +12,12 @@ import {
   Eye,
   Pencil,
   Trash2,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import { FilterRail } from "@/components/ui/filter-rail";
 import {
   Select,
   SelectContent,
@@ -22,14 +25,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,14 +39,18 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { deleteApplicant } from "@/lib/actions";
-import {
-  getStatusConfig,
-  getScoreColor,
-  formatDate,
-} from "@/lib/utils";
+import { getStatusConfig, getScoreColor, cn } from "@/lib/utils";
 import { ApplicantAvatar } from "@/components/ui/applicant-avatar";
 import { ACADEMIC_LABELS, CHILD_STATUS_LABELS } from "@/lib/scoring";
-import type { Applicant, ApplicantStatus, AcademicMerit } from "@/types";
+import type { Applicant, ApplicantStatus, AcademicMerit, ChildStatus } from "@/types";
+
+const STATUS_TABS: { key: ApplicantStatus | "all"; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "pending", label: "Pending" },
+  { key: "reviewed", label: "Reviewed" },
+  { key: "selected", label: "Selected" },
+  { key: "rejected", label: "Rejected" },
+];
 
 type SortKey = "firstName" | "institution" | "totalScore" | "appliedDate" | "status";
 
@@ -64,6 +63,7 @@ export default function ApplicantsClient({ initialApplicants }: Props) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<ApplicantStatus | "all">("all");
   const [academicFilter, setAcademicFilter] = useState<AcademicMerit | "all">("all");
+  const [childStatusFilter, setChildStatusFilter] = useState<ChildStatus | "all">("all");
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({
     key: "totalScore",
     dir: "desc",
@@ -88,6 +88,8 @@ export default function ApplicantsClient({ initialApplicants }: Props) {
     }
     if (statusFilter !== "all") list = list.filter((a) => a.status === statusFilter);
     if (academicFilter !== "all") list = list.filter((a) => a.academicMerit === academicFilter);
+    if (childStatusFilter !== "all")
+      list = list.filter((a) => a.childStatus === childStatusFilter);
 
     list.sort((a, b) => {
       const av = a[sort.key];
@@ -100,22 +102,17 @@ export default function ApplicantsClient({ initialApplicants }: Props) {
     });
 
     return list;
-  }, [applicants, search, statusFilter, academicFilter, sort]);
+  }, [applicants, search, statusFilter, academicFilter, childStatusFilter, sort]);
 
-  function toggleSort(key: SortKey) {
-    setSort((prev) =>
-      prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" }
-    );
+  function toggleSortDir() {
+    setSort((prev) => ({ ...prev, dir: prev.dir === "asc" ? "desc" : "asc" }));
   }
 
-  function SortIcon({ col }: { col: SortKey }) {
-    if (sort.key !== col)
-      return <ChevronUp className="w-3 h-3 text-muted-foreground/40 ml-1 inline" />;
-    return sort.dir === "asc" ? (
-      <ChevronUp className="w-3 h-3 text-primary ml-1 inline" />
-    ) : (
-      <ChevronDown className="w-3 h-3 text-primary ml-1 inline" />
-    );
+  function clearFilters() {
+    setSearch("");
+    setStatusFilter("all");
+    setAcademicFilter("all");
+    setChildStatusFilter("all");
   }
 
   async function handleDelete() {
@@ -133,192 +130,183 @@ export default function ApplicantsClient({ initialApplicants }: Props) {
   }
 
   return (
-    <main className="flex-1 p-6 lg:p-8 space-y-6">
-      {/* Header */}
+    <main className="flex-1 px-6 lg:px-8 pb-6 lg:pb-8 space-y-6">
+      {/* Section heading */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Applicants</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {filtered.length} of {applicants.length} applicants
-          </p>
-        </div>
-        <Button asChild>
+        <h2 className="text-lg font-semibold text-primary">Applicants</h2>
+        <Button asChild size="sm">
           <Link href="/applicants/new" className="flex items-center gap-1.5">
             <UserPlus className="w-4 h-4" />
             New Applicant
           </Link>
         </Button>
       </div>
+      <p className="text-sm text-muted-foreground -mt-4">
+        {filtered.length} of {applicants.length} applicants
+      </p>
 
-      {/* Filters */}
-      <motion.div
-        className="flex flex-wrap gap-3"
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search applicants..."
-            className="pl-9"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as ApplicantStatus | "all")}>
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="reviewed">Reviewed</SelectItem>
-            <SelectItem value="selected">Selected</SelectItem>
-            <SelectItem value="rejected">Rejected</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={academicFilter} onValueChange={(v) => setAcademicFilter(v as AcademicMerit | "all")}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="CBC Level" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All CBC Levels</SelectItem>
-            <SelectItem value="ee">Exceeds Expectation</SelectItem>
-            <SelectItem value="me">Meets Expectation</SelectItem>
-            <SelectItem value="ae">Approaches Expectation</SelectItem>
-            <SelectItem value="be">Below Expectation</SelectItem>
-          </SelectContent>
-        </Select>
-      </motion.div>
+      {/* Rail + content */}
+      <div className="flex flex-col sm:flex-row gap-6">
+        <FilterRail
+          label="Filter by status"
+          options={STATUS_TABS}
+          value={statusFilter}
+          onChange={setStatusFilter}
+        />
 
-      {/* Table */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0, transition: { delay: 0.1 } }}
-        className="rounded-lg border border-border bg-card overflow-hidden"
-      >
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/30">
-              <TableHead className="w-10">#</TableHead>
-              <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("firstName")}>
-                Applicant <SortIcon col="firstName" />
-              </TableHead>
-              <TableHead className="cursor-pointer select-none hidden md:table-cell" onClick={() => toggleSort("institution")}>
-                School <SortIcon col="institution" />
-              </TableHead>
-              <TableHead className="hidden lg:table-cell">Child Status</TableHead>
-              <TableHead className="hidden lg:table-cell">CBC Level</TableHead>
-              <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("totalScore")}>
-                Score <SortIcon col="totalScore" />
-              </TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="cursor-pointer select-none hidden xl:table-cell" onClick={() => toggleSort("appliedDate")}>
-                Applied <SortIcon col="appliedDate" />
-              </TableHead>
-              <TableHead className="w-10" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+        <div className="flex-1 min-w-0 space-y-6">
+          {/* Filters */}
+          <motion.div
+            className="flex flex-wrap gap-3 items-center"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search applicants..."
+                className="pl-9"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <Select value={academicFilter} onValueChange={(v) => setAcademicFilter(v as AcademicMerit | "all")}>
+              <SelectTrigger className="w-[210px]">
+                <SelectValue placeholder="Academic Merit" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Academic Merit</SelectItem>
+                {(Object.keys(ACADEMIC_LABELS) as AcademicMerit[]).map((k) => (
+                  <SelectItem key={k} value={k}>
+                    {ACADEMIC_LABELS[k]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={childStatusFilter}
+              onValueChange={(v) => setChildStatusFilter(v as ChildStatus | "all")}
+            >
+              <SelectTrigger className="w-[190px]">
+                <SelectValue placeholder="Child Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Child Statuses</SelectItem>
+                {(Object.keys(CHILD_STATUS_LABELS) as ChildStatus[]).map((k) => (
+                  <SelectItem key={k} value={k}>
+                    {CHILD_STATUS_LABELS[k]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex gap-1.5">
+              <Select value={sort.key} onValueChange={(v) => setSort((s) => ({ key: v as SortKey, dir: s.dir }))}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="firstName">Name</SelectItem>
+                  <SelectItem value="institution">School</SelectItem>
+                  <SelectItem value="totalScore">Score</SelectItem>
+                  <SelectItem value="appliedDate">Applied Date</SelectItem>
+                  <SelectItem value="status">Status</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button variant="outline" size="icon" onClick={toggleSortDir} title="Toggle sort direction">
+                {sort.dir === "asc" ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
+              </Button>
+            </div>
+            <Button
+              variant="outline"
+              onClick={clearFilters}
+              className="text-primary border-primary hover:bg-primary/5 sm:ml-auto"
+            >
+              <X className="w-4 h-4" /> Clear filters
+            </Button>
+          </motion.div>
+
+          {/* Card grid */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0, transition: { delay: 0.1 } }}
+            className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6"
+          >
             {filtered.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
-                  No applicants found.
-                </TableCell>
-              </TableRow>
+              <div className="col-span-full text-center py-16 text-muted-foreground">
+                No applicants found.
+              </div>
             ) : (
-              filtered.map((app, i) => {
+              filtered.map((app) => {
                 const status = getStatusConfig(app.status);
                 return (
-                  <TableRow key={app.id} className="group">
-                    <TableCell className="text-muted-foreground text-xs font-mono">
-                      {i + 1}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2.5">
-                        <ApplicantAvatar
-                          firstName={app.firstName}
-                          lastName={app.lastName}
-                          photoUrl={app.profilePhotoUrl}
-                          size={32}
-                        />
-                        <div className="min-w-0">
-                          <Link
-                            href={`/applicants/${app.id}`}
-                            className="text-sm font-medium hover:text-primary transition-colors truncate block"
-                          >
-                            {app.firstName} {app.lastName}
+                  <Card key={app.id} className="p-5 flex flex-col items-center text-center relative">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="absolute top-2 right-2 h-7 w-7">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem asChild>
+                          <Link href={`/applicants/${app.id}`} className="flex items-center gap-2">
+                            <Eye className="w-4 h-4" /> View
                           </Link>
-                          <p className="text-xs text-muted-foreground truncate">{app.location || app.nationality}</p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <p className="text-sm truncate max-w-[180px]">{app.institution}</p>
-                      <p className="text-xs text-muted-foreground">Grade {app.yearOfStudy}</p>
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-secondary border border-border text-secondary-foreground">
-                        {CHILD_STATUS_LABELS[app.childStatus] ?? app.childStatus}
-                      </span>
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-violet-50 border border-violet-200 text-violet-700 font-medium uppercase">
-                        {app.academicMerit?.toUpperCase() ?? "—"}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span className={`text-sm font-bold ${getScoreColor(app.totalScore)}`}>
-                        {app.totalScore.toFixed(1)}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap ${status.className}`}>
-                        {status.label}
-                      </span>
-                    </TableCell>
-                    <TableCell className="hidden xl:table-cell text-xs text-muted-foreground">
-                      {formatDate(app.appliedDate)}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="opacity-0 group-hover:opacity-100 h-7 w-7"
-                          >
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <Link href={`/applicants/${app.id}`} className="flex items-center gap-2">
-                              <Eye className="w-4 h-4" /> View
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem asChild>
-                            <Link href={`/applicants/${app.id}/edit`} className="flex items-center gap-2">
-                              <Pencil className="w-4 h-4" /> Edit
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-destructive flex items-center gap-2"
-                            onClick={() => setDeleteTarget(app)}
-                          >
-                            <Trash2 className="w-4 h-4" /> Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link href={`/applicants/${app.id}/edit`} className="flex items-center gap-2">
+                            <Pencil className="w-4 h-4" /> Edit
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive flex items-center gap-2"
+                          onClick={() => setDeleteTarget(app)}
+                        >
+                          <Trash2 className="w-4 h-4" /> Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    <ApplicantAvatar
+                      firstName={app.firstName}
+                      lastName={app.lastName}
+                      photoUrl={app.profilePhotoUrl}
+                      size={88}
+                      className="mb-3"
+                    />
+
+                    <Link
+                      href={`/applicants/${app.id}`}
+                      className="font-semibold hover:text-primary transition-colors"
+                    >
+                      {app.firstName} {app.lastName}
+                    </Link>
+                    <p className="text-sm text-muted-foreground mt-0.5 italic">{app.institution}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Grade {app.yearOfStudy} · {app.location || app.nationality}
+                    </p>
+                    <p className={cn("text-xs font-semibold mt-0.5", getScoreColor(app.totalScore))}>
+                      Score {app.totalScore.toFixed(1)}
+                    </p>
+                    <span
+                      className={cn(
+                        "mt-3 px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap",
+                        status.className
+                      )}
+                    >
+                      {status.label}
+                    </span>
+                  </Card>
                 );
               })
             )}
-          </TableBody>
-        </Table>
-      </motion.div>
+          </motion.div>
+        </div>
+      </div>
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) { setDeleteTarget(null); setDeleteError(null); } }}>

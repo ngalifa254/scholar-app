@@ -77,6 +77,8 @@ export interface Scholar {
   guardianContact: string;
   yearJoined: number;
   notes: string;
+  thankYouNote?: string;
+  featured?: boolean;
   status: ScholarStatus;
   createdAt: string;
   term1ReportUrl?: string;

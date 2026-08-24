@@ -239,6 +239,8 @@ type ScholarRow = {
   guardian_contact: string;
   year_joined: number;
   notes: string;
+  thank_you_note?: string | null;
+  featured?: boolean | null;
   status: ScholarStatus;
   created_at: string;
   term1_report_url?: string | null;
@@ -259,6 +261,8 @@ function rowToScholar(row: ScholarRow): Scholar {
     guardianContact: row.guardian_contact ?? "",
     yearJoined: row.year_joined ?? 0,
     notes: row.notes ?? "",
+    thankYouNote: row.thank_you_note ?? undefined,
+    featured: row.featured ?? false,
     status: row.status ?? "active",
     createdAt: row.created_at,
     term1ReportUrl: row.term1_report_url ?? undefined,
@@ -267,10 +271,11 @@ function rowToScholar(row: ScholarRow): Scholar {
   };
 }
 
-export async function getScholars(opts?: { search?: string; status?: ScholarStatus | "all" }): Promise<Scholar[]> {
+export async function getScholars(opts?: { search?: string; status?: ScholarStatus | "all"; featured?: boolean }): Promise<Scholar[]> {
   const supabase = await createSupabaseServerClient();
   let query = supabase.from("scholars").select("*").order("created_at", { ascending: false });
   if (opts?.status && opts.status !== "all") query = query.eq("status", opts.status);
+  if (opts?.featured) query = query.eq("featured", true);
   const { data, error } = await query;
   if (error) throw new Error(error.message);
   let results = (data as ScholarRow[]).map(rowToScholar);

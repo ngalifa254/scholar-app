@@ -37,8 +37,10 @@ export default function ScholarFormClient({ scholar }: Props) {
     guardianContact: scholar?.guardianContact ?? "",
     yearJoined: String(scholar?.yearJoined ?? new Date().getFullYear()),
     notes: scholar?.notes ?? "",
+    thankYouNote: scholar?.thankYouNote ?? "",
     status: scholar?.status ?? "active",
   });
+  const [featured, setFeatured] = useState(scholar?.featured ?? false);
 
   function set(key: keyof typeof form, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -56,6 +58,7 @@ export default function ScholarFormClient({ scholar }: Props) {
     setError(null);
     const fd = new FormData();
     Object.entries(form).forEach(([k, v]) => fd.append(k, v));
+    fd.append("featured", String(featured));
     if (profilePhoto) fd.append("profilePhoto", profilePhoto);
     if (isEdit) {
       fd.append("existingPhotoUrl", scholar!.profilePhotoUrl ?? "");
@@ -200,6 +203,33 @@ export default function ScholarFormClient({ scholar }: Props) {
               <Label>Notes</Label>
               <Textarea rows={3} value={form.notes} onChange={(e) => set("notes", e.target.value)} placeholder="Any additional notes…" />
             </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0, transition: { delay: 0.18 } }}>
+        <Card>
+          <CardHeader><CardTitle>Message to Donors</CardTitle></CardHeader>
+          <CardContent className="space-y-1.5">
+            <Label>Thank-You Note</Label>
+            <Textarea
+              rows={3}
+              value={form.thankYouNote}
+              onChange={(e) => set("thankYouNote", e.target.value)}
+              placeholder="A short thank-you message shown publicly on the dashboard…"
+            />
+            <p className="text-xs text-muted-foreground">
+              Shown publicly on the dashboard, unlike the private notes above.
+            </p>
+            <label className="flex items-center gap-2 pt-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={featured}
+                onChange={(e) => setFeatured(e.target.checked)}
+                className="w-4 h-4 rounded border-input accent-primary"
+              />
+              Feature this scholar on the Showcase page
+            </label>
           </CardContent>
         </Card>
       </motion.div>

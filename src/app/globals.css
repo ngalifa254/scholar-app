@@ -20,6 +20,7 @@
     --input: #DDD9D0;
     --ring: #15803D;
     --radius: 0.5rem;
+    --accent-blue: #1E3A5F;
 
     --sidebar-bg: #0E1520;
     --sidebar-fg: #E4E9EF;
@@ -49,8 +50,10 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-accent-blue: var(--accent-blue);
   --font-sans: var(--font-geist-sans), system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), monospace;
+  --font-serif: var(--font-serif-display), Georgia, serif;
   --radius-sm: calc(var(--radius) - 0.125rem);
   --radius-md: var(--radius);
   --radius-lg: calc(var(--radius) + 0.25rem);

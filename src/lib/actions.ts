@@ -264,6 +264,8 @@ function parseScholarFormData(fd: FormData) {
     guardian_contact: String(fd.get("guardianContact") ?? ""),
     year_joined: Number(fd.get("yearJoined") ?? new Date().getFullYear()),
     notes: String(fd.get("notes") ?? ""),
+    thank_you_note: String(fd.get("thankYouNote") ?? ""),
+    featured: fd.get("featured") === "true",
     status: String(fd.get("status") ?? "active") as ScholarStatus,
   };
 }
