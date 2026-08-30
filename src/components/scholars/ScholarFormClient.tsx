@@ -38,6 +38,7 @@ export default function ScholarFormClient({ scholar }: Props) {
     yearJoined: String(scholar?.yearJoined ?? new Date().getFullYear()),
     notes: scholar?.notes ?? "",
     thankYouNote: scholar?.thankYouNote ?? "",
+    careerAspiration: scholar?.careerAspiration ?? "",
     status: scholar?.status ?? "active",
   });
   const [featured, setFeatured] = useState(scholar?.featured ?? false);
@@ -230,6 +231,24 @@ export default function ScholarFormClient({ scholar }: Props) {
               />
               Feature this scholar on the Showcase page
             </label>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0, transition: { delay: 0.24 } }}>
+        <Card>
+          <CardHeader><CardTitle>Career Aspiration</CardTitle></CardHeader>
+          <CardContent className="space-y-1.5">
+            <Label>What does this student dream of becoming?</Label>
+            <Textarea
+              rows={3}
+              value={form.careerAspiration}
+              onChange={(e) => set("careerAspiration", e.target.value)}
+              placeholder="e.g. doctor, engineer, teacher…"
+            />
+            <p className="text-xs text-muted-foreground">
+              Shown on the student&apos;s profile page.
+            </p>
           </CardContent>
         </Card>
       </motion.div>

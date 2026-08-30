@@ -14,6 +14,7 @@ import {
   FileText,
   Loader2,
   ExternalLink,
+  Rocket,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -127,6 +128,32 @@ export default function ScholarDetailClient({ scholar }: Props) {
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* Career Aspiration */}
+      {scholar.careerAspiration && (
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0, transition: { delay: 0.06 } }}>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <Rocket className="w-4 h-4" /> Career Aspiration
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-4 items-start">
+                <ApplicantAvatar
+                  firstName={scholar.firstName}
+                  lastName={scholar.lastName}
+                  photoUrl={scholar.profilePhotoUrl}
+                  size={56}
+                />
+                <p className="flex-1 text-sm leading-relaxed italic text-muted-foreground whitespace-pre-wrap">
+                  &ldquo;{scholar.careerAspiration}&rdquo;
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Info cards */}
       <motion.div

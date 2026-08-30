@@ -11,6 +11,9 @@ import type {
   ScholarStatus,
   PastBeneficiary,
   BeneficiaryStatus,
+  Donor,
+  Donation,
+  DonorStatus,
 } from "@/types";
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -240,6 +243,7 @@ type ScholarRow = {
   year_joined: number;
   notes: string;
   thank_you_note?: string | null;
+  career_aspiration?: string | null;
   featured?: boolean | null;
   status: ScholarStatus;
   created_at: string;
@@ -262,6 +266,7 @@ function rowToScholar(row: ScholarRow): Scholar {
     yearJoined: row.year_joined ?? 0,
     notes: row.notes ?? "",
     thankYouNote: row.thank_you_note ?? undefined,
+    careerAspiration: row.career_aspiration ?? undefined,
     featured: row.featured ?? false,
     status: row.status ?? "active",
     createdAt: row.created_at,
@@ -350,6 +355,114 @@ export async function getPastBeneficiaryById(id: string): Promise<PastBeneficiar
   const { data, error } = await supabase.from("past_beneficiaries").select("*").eq("id", id).single();
   if (error) return null;
   return rowToBeneficiary(data as PastBeneficiaryRow);
+}
+
+// ─── Donors ────────────────────────────────────────────────────────────────
+
+type DonorRow = {
+  id: string;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  status: DonorStatus;
+  notes?: string | null;
+  created_at: string;
+};
+
+type DonationRow = {
+  id: string;
+  donor_id: string;
+  scholar_id?: string | null;
+  amount: number;
+  contributed_on: string;
+  note?: string | null;
+  created_at: string;
+  scholars?: { first_name: string; last_name: string } | null;
+};
+
+function rowToDonation(row: DonationRow): Donation {
+  return {
+    id: row.id,
+    donorId: row.donor_id,
+    scholarId: row.scholar_id ?? undefined,
+    scholarName: row.scholars ? `${row.scholars.first_name} ${row.scholars.last_name}` : undefined,
+    amount: Number(row.amount) || 0,
+    contributedOn: row.contributed_on,
+    note: row.note ?? undefined,
+    createdAt: row.created_at,
+  };
+}
+
+function computeDonorStatus(lastContributionDate?: string): DonorStatus {
+  if (!lastContributionDate) return "past";
+  const cutoff = Date.now() - 365 * 24 * 60 * 60 * 1000;
+  return new Date(lastContributionDate).getTime() >= cutoff ? "active" : "past";
+}
+
+function buildDonor(row: DonorRow, donations: Donation[]): Donor {
+  const sorted = [...donations].sort(
+    (a, b) => new Date(b.contributedOn).getTime() - new Date(a.contributedOn).getTime()
+  );
+  const totalContributed = sorted.reduce((sum, d) => sum + d.amount, 0);
+  const lastContributionDate = sorted[0]?.contributedOn;
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email ?? "",
+    phone: row.phone ?? "",
+    status: computeDonorStatus(lastContributionDate),
+    notes: row.notes ?? "",
+    createdAt: row.created_at,
+    donations: sorted,
+    totalContributed,
+    lastContributionDate,
+    lastContributionAmount: sorted[0]?.amount,
+  };
+}
+
+export async function getDonors(opts?: { search?: string; status?: DonorStatus | "all" }): Promise<Donor[]> {
+  const supabase = await createSupabaseServerClient();
+  let query = supabase.from("donors").select("*").order("name", { ascending: true });
+  if (opts?.status && opts.status !== "all") query = query.eq("status", opts.status);
+  const { data: donorRows, error } = await query;
+  if (error) throw new Error(error.message);
+
+  const { data: donationRows, error: donationsError } = await supabase
+    .from("donations")
+    .select("*, scholars(first_name, last_name)");
+  if (donationsError) throw new Error(donationsError.message);
+
+  const donationsByDonor = new Map<string, Donation[]>();
+  for (const row of (donationRows as unknown as DonationRow[]) ?? []) {
+    const donation = rowToDonation(row);
+    const list = donationsByDonor.get(donation.donorId) ?? [];
+    list.push(donation);
+    donationsByDonor.set(donation.donorId, list);
+  }
+
+  let results = (donorRows as DonorRow[]).map((row) => buildDonor(row, donationsByDonor.get(row.id) ?? []));
+  if (opts?.search) {
+    const q = opts.search.toLowerCase();
+    results = results.filter(
+      (d) => d.name.toLowerCase().includes(q) || d.email.toLowerCase().includes(q)
+    );
+  }
+  return results;
+}
+
+export async function getDonorById(id: string): Promise<Donor | null> {
+  const supabase = await createSupabaseServerClient();
+  const { data: donorRow, error } = await supabase.from("donors").select("*").eq("id", id).single();
+  if (error) return null;
+
+  const { data: donationRows, error: donationsError } = await supabase
+    .from("donations")
+    .select("*, scholars(first_name, last_name)")
+    .eq("donor_id", id);
+  if (donationsError) throw new Error(donationsError.message);
+
+  const donations = ((donationRows as unknown as DonationRow[]) ?? []).map(rowToDonation);
+  return buildDonor(donorRow as DonorRow, donations);
 }
 
 // ─── Form Templates ───────────────────────────────────────────────────────────

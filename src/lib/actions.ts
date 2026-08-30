@@ -265,6 +265,7 @@ function parseScholarFormData(fd: FormData) {
     year_joined: Number(fd.get("yearJoined") ?? new Date().getFullYear()),
     notes: String(fd.get("notes") ?? ""),
     thank_you_note: String(fd.get("thankYouNote") ?? ""),
+    career_aspiration: String(fd.get("careerAspiration") ?? ""),
     featured: fd.get("featured") === "true",
     status: String(fd.get("status") ?? "active") as ScholarStatus,
   };
@@ -401,6 +402,82 @@ export async function deletePastBeneficiary(id: string): Promise<{ error?: strin
   const { error } = await supabase.from("past_beneficiaries").delete().eq("id", id);
   if (error) return { error: error.message };
   revalidatePath("/past-beneficiaries");
+  return {};
+}
+
+// ─── Donors ────────────────────────────────────────────────────────────────
+
+function parseDonorFormData(fd: FormData) {
+  return {
+    name: String(fd.get("name") ?? ""),
+    email: String(fd.get("email") ?? ""),
+    phone: String(fd.get("phone") ?? ""),
+    notes: String(fd.get("notes") ?? ""),
+  };
+}
+
+export async function createDonor(
+  _prevState: { error?: string } | null,
+  formData: FormData
+): Promise<{ error?: string }> {
+  const supabase = await createSupabaseServerClient();
+  const payload = parseDonorFormData(formData);
+  const { error } = await supabase.from("donors").insert(payload);
+  if (error) return { error: error.message };
+  revalidatePath("/donors");
+  redirect("/donors");
+}
+
+export async function updateDonor(
+  id: string,
+  _prevState: { error?: string } | null,
+  formData: FormData
+): Promise<{ error?: string }> {
+  const supabase = await createSupabaseServerClient();
+  const payload = parseDonorFormData(formData);
+  const { error } = await supabase.from("donors").update(payload).eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath("/donors");
+  revalidatePath(`/donors/${id}`);
+  redirect(`/donors/${id}`);
+}
+
+export async function deleteDonor(id: string): Promise<{ error?: string }> {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("donors").delete().eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath("/donors");
+  return {};
+}
+
+export async function createDonation(
+  donorId: string,
+  formData: FormData
+): Promise<{ error?: string }> {
+  const supabase = await createSupabaseServerClient();
+  const amount = Number(formData.get("amount") ?? 0);
+  const contributed_on = String(formData.get("contributedOn") ?? "");
+  const scholarId = String(formData.get("scholarId") ?? "");
+  const note = String(formData.get("note") ?? "");
+  const { error } = await supabase.from("donations").insert({
+    donor_id: donorId,
+    scholar_id: scholarId || null,
+    amount,
+    contributed_on,
+    note,
+  });
+  if (error) return { error: error.message };
+  revalidatePath(`/donors/${donorId}`);
+  revalidatePath("/donors");
+  return {};
+}
+
+export async function deleteDonation(donationId: string, donorId: string): Promise<{ error?: string }> {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("donations").delete().eq("id", donationId);
+  if (error) return { error: error.message };
+  revalidatePath(`/donors/${donorId}`);
+  revalidatePath("/donors");
   return {};
 }
 

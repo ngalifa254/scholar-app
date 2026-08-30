@@ -162,10 +162,6 @@ function MiniCalendar() {
 }
 
 export default function DashboardClient({ scholars, top3, kpi }: Props) {
-  const selectionRate = kpi.totalApplicants
-    ? Math.round((kpi.selected / kpi.totalApplicants) * 100)
-    : 0;
-
   const thankYouScholars = scholars.filter((s) => s.thankYouNote && s.thankYouNote.trim());
 
   const recentActivity = [...scholars]
@@ -212,16 +208,7 @@ export default function DashboardClient({ scholars, top3, kpi }: Props) {
         <LiveClock />
       </motion.div>
 
-      {/* Greeting */}
-      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
-        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="font-serif text-3xl md:text-4xl font-bold text-foreground tracking-tight">
-            Hi Admin, welcome back!
-          </h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            {selectionRate}% selection rate across {kpi.totalApplicants} applicants
-          </p>
-        </motion.div>
+      <div className="flex justify-end">
         <motion.div
           initial={{ opacity: 0, x: 8 }}
           animate={{ opacity: 1, x: 0, transition: { delay: 0.15 } }}

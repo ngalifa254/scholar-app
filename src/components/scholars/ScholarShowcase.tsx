@@ -42,7 +42,7 @@ export default function ScholarShowcase({ scholars }: Props) {
         >
           <Card>
             <CardContent className="p-6">
-              <div className={`flex flex-col sm:flex-row gap-6 ${i % 2 === 1 ? "sm:flex-row-reverse" : ""}`}>
+              <div className="flex flex-col sm:flex-row gap-6">
                 <PassportPhoto
                   firstName={scholar.firstName}
                   lastName={scholar.lastName}

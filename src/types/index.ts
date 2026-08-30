@@ -78,6 +78,7 @@ export interface Scholar {
   yearJoined: number;
   notes: string;
   thankYouNote?: string;
+  careerAspiration?: string;
   featured?: boolean;
   status: ScholarStatus;
   createdAt: string;
@@ -102,6 +103,33 @@ export interface AppSettings {
   scoringAcademic: number;
   scoringCharacter: number;
   scoringHardship: number;
+}
+
+export type DonorStatus = 'active' | 'past';
+
+export interface Donation {
+  id: string;
+  donorId: string;
+  scholarId?: string;
+  scholarName?: string;
+  amount: number;
+  contributedOn: string;
+  note?: string;
+  createdAt: string;
+}
+
+export interface Donor {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  status: DonorStatus;
+  notes: string;
+  createdAt: string;
+  donations: Donation[];
+  totalContributed: number;
+  lastContributionDate?: string;
+  lastContributionAmount?: number;
 }
 
 export interface PastBeneficiary {

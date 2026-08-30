@@ -324,6 +324,11 @@ export default function ScholarsClient({ initialScholars }: Props) {
                     {scholar.yearJoined > 0 && (
                       <p className="text-xs text-muted-foreground mt-0.5">Joined {scholar.yearJoined}</p>
                     )}
+                    {scholar.careerAspiration && (
+                      <p className="text-xs text-muted-foreground italic mt-2 line-clamp-2">
+                        &ldquo;{scholar.careerAspiration}&rdquo;
+                      </p>
+                    )}
                     <span
                       className={cn(
                         "mt-3 px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap",

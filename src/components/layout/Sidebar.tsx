@@ -12,6 +12,7 @@ import {
   GraduationCap,
   BookOpen,
   Award,
+  HandCoins,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -23,17 +24,23 @@ const NAV_GROUPS = [
     ],
   },
   {
-    label: "Applications",
-    items: [
-      { label: "Applicants", href: "/applicants", icon: Users },
-      { label: "Add Applicant", href: "/applicants/new", icon: UserPlus },
-    ],
-  },
-  {
     label: "Beneficiaries",
     items: [
       { label: "Scholars", href: "/scholars", icon: GraduationCap },
       { label: "Past Beneficiaries", href: "/past-beneficiaries", icon: Award },
+    ],
+  },
+  {
+    label: "Fundraising",
+    items: [
+      { label: "Donors", href: "/donors", icon: HandCoins },
+    ],
+  },
+  {
+    label: "Applications",
+    items: [
+      { label: "Applicants", href: "/applicants", icon: Users },
+      { label: "Add Applicant", href: "/applicants/new", icon: UserPlus },
     ],
   },
   {

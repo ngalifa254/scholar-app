@@ -64,6 +64,14 @@ export function formatDate(dateString: string): string {
   });
 }
 
+export function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat("en-KE", {
+    style: "currency",
+    currency: "KES",
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
 export function getRankMedal(rank: number): string {
   if (rank === 1) return "🥇";
   if (rank === 2) return "🥈";
