@@ -1,0 +1,44 @@
+{
+  "name": "wahome-foundation-student-center-desktop",
+  "version": "0.1.0",
+  "description": "Desktop window for the Wahome Foundation Student Center.",
+  "author": "Wahome Foundation",
+  "main": "main.cjs",
+  "scripts": {
+    "desktop": "electron .",
+    "desktop:win": "electron-builder --win nsis --publish never",
+    "desktop:mac": "electron-builder --mac dmg --universal --publish never"
+  },
+  "devDependencies": {
+    "electron": "44.11.1",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "org.wahomefoundation.studentcenter",
+    "productName": "Wahome Foundation Student Center",
+    "asar": true,
+    "files": [
+      "main.cjs",
+      "package.json"
+    ],
+    "directories": {
+      "output": "../release"
+    },
+    "mac": {
+      "category": "public.app-category.education",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    }
+  }
+}

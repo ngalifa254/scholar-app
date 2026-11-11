@@ -6,7 +6,8 @@ credentials stay on the server; the desktop package contains only the secure
 Electron window shell.
 
 For local development, start Next.js in one terminal and point Electron at it
-from another PowerShell terminal:
+from another PowerShell terminal. Install the desktop dependencies once from
+the repository root with `npm install --prefix electron`:
 
 ```powershell
 $env:SCHOLAR_APP_URL = "http://localhost:3000"
