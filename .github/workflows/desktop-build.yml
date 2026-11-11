@@ -15,9 +15,11 @@ jobs:
           - os: windows-latest
             script: desktop:win
             artifact: windows-installer
+            artifact-path: release/*.exe
           - os: macos-latest
             script: desktop:mac
             artifact: macos-installer
+            artifact-path: release/*.dmg
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -31,5 +33,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: release/*
+          path: ${{ matrix.artifact-path }}
           if-no-files-found: error
