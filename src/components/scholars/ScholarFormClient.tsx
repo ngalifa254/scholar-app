@@ -106,7 +106,7 @@ export default function ScholarFormClient({ scholar }: Props) {
                 className="group relative w-16 h-16 rounded-full overflow-hidden bg-primary/10 flex items-center justify-center border-2 border-dashed border-primary/30 hover:border-primary/60 transition-colors shrink-0"
               >
                 {photoPreview ? (
-                  <Image src={photoPreview} alt="Profile" fill className="object-cover" sizes="64px" />
+                  <Image src={photoPreview} alt="Profile" fill unoptimized className="object-cover" sizes="64px" />
                 ) : (
                   <Camera className="w-6 h-6 text-primary/50 group-hover:text-primary/80 transition-colors" />
                 )}

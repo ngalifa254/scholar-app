@@ -2,22 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createSupabaseServerClient, createSupabaseAdminClient } from "./supabase";
+import { getStaffFirestore } from "./staff-firestore";
+import { privateFileUrl, uploadStaffFile, deleteStaffFile } from "./staff-storage";
 import { computeScore } from "./scoring";
 import type { ApplicantStatus, AppSettings, ChildStatus, AcademicMerit, CharacterLeadership, ScholarStatus, BeneficiaryStatus } from "@/types";
 
 async function uploadProfilePhoto(file: File): Promise<string | null> {
-  const supabase = createSupabaseAdminClient();
-  const ext = file.name.split(".").pop() ?? "jpg";
-  const path = `${crypto.randomUUID()}.${ext}`;
-  const { error } = await supabase.storage
-    .from("applicant-photos")
-    .upload(path, file, { contentType: file.type, upsert: false });
-  if (error) {
-    console.error("Photo upload failed:", error.message);
-    return null;
-  }
-  return supabase.storage.from("applicant-photos").getPublicUrl(path).data.publicUrl;
+  const path = await uploadStaffFile(file, "photos");
+  return privateFileUrl(path);
 }
 
 function parseApplicantFormData(fd: FormData) {
@@ -69,7 +61,7 @@ export async function createApplicant(
   _prevState: { error?: string } | null,
   formData: FormData
 ): Promise<{ error?: string }> {
-  const supabase = await createSupabaseServerClient();
+  const db = await getStaffFirestore();
   const payload = parseApplicantFormData(formData);
 
   const photoFile = formData.get("profilePhoto") as File | null;
@@ -78,10 +70,13 @@ export async function createApplicant(
     profilePhotoUrl = await uploadProfilePhoto(photoFile);
   }
 
-  const { error } = await supabase
-    .from("applicants")
-    .insert({ ...payload, profile_photo_url: profilePhotoUrl });
-  if (error) return { error: error.message };
+  const ref = db.collection("applicants").doc();
+  await ref.set({
+    ...payload,
+    profile_photo_url: profilePhotoUrl,
+    applied_date: new Date().toISOString().slice(0, 10),
+    created_at: new Date().toISOString(),
+  });
 
   revalidatePath("/applicants");
   revalidatePath("/");
@@ -93,7 +88,7 @@ export async function updateApplicant(
   _prevState: { error?: string } | null,
   formData: FormData
 ): Promise<{ error?: string }> {
-  const supabase = await createSupabaseServerClient();
+  const db = await getStaffFirestore();
   const payload = parseApplicantFormData(formData);
 
   const photoFile = formData.get("profilePhoto") as File | null;
@@ -104,11 +99,7 @@ export async function updateApplicant(
     if (uploaded) profilePhotoUrl = uploaded;
   }
 
-  const { error } = await supabase
-    .from("applicants")
-    .update({ ...payload, profile_photo_url: profilePhotoUrl })
-    .eq("id", id);
-  if (error) return { error: error.message };
+  await db.collection("applicants").doc(id).update({ ...payload, profile_photo_url: profilePhotoUrl });
 
   revalidatePath("/applicants");
   revalidatePath(`/applicants/${id}`);
@@ -119,9 +110,8 @@ export async function updateApplicant(
 export async function deleteApplicant(
   id: string
 ): Promise<{ error?: string }> {
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.from("applicants").delete().eq("id", id);
-  if (error) return { error: error.message };
+  const db = await getStaffFirestore();
+  await db.collection("applicants").doc(id).delete();
 
   revalidatePath("/applicants");
   revalidatePath("/");
@@ -132,12 +122,8 @@ export async function updateApplicantStatus(
   id: string,
   status: ApplicantStatus
 ): Promise<{ error?: string }> {
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase
-    .from("applicants")
-    .update({ status })
-    .eq("id", id);
-  if (error) return { error: error.message };
+  const db = await getStaffFirestore();
+  await db.collection("applicants").doc(id).update({ status });
   revalidatePath("/applicants");
   revalidatePath(`/applicants/${id}`);
   revalidatePath("/");
@@ -154,6 +140,14 @@ const DOC_TYPE_COL: Record<ApplicantDocType, string> = {
   recommendation: "recommendation_url",
 };
 
+function filePathFromPrivateUrl(url: string) {
+  try {
+    return new URL(url, "http://localhost").searchParams.get("path") ?? "";
+  } catch {
+    return "";
+  }
+}
+
 export async function uploadApplicantDocument(
   applicantId: string,
   docType: ApplicantDocType,
@@ -162,24 +156,17 @@ export async function uploadApplicantDocument(
   const file = formData.get("file") as File | null;
   if (!file || file.size === 0) return { error: "No file provided" };
 
-  const adminClient = createSupabaseAdminClient();
-  const ext = file.name.split(".").pop() ?? "pdf";
-  const path = `docs/${crypto.randomUUID()}.${ext}`;
-
-  const { error: uploadError } = await adminClient.storage
-    .from("applicant-photos")
-    .upload(path, file, { contentType: file.type, upsert: false });
-  if (uploadError) return { error: uploadError.message };
-
-  const url = adminClient.storage.from("applicant-photos").getPublicUrl(path).data.publicUrl;
-
+  const path = await uploadStaffFile(file, "docs");
+  const url = privateFileUrl(path);
   const col = DOC_TYPE_COL[docType];
-  const supabase = await createSupabaseServerClient();
-  const { error: dbError } = await supabase
-    .from("applicants")
-    .update({ [col]: url })
-    .eq("id", applicantId);
-  if (dbError) return { error: dbError.message };
+  const db = await getStaffFirestore();
+  const applicantRef = db.collection("applicants").doc(applicantId);
+  const existing = await applicantRef.get();
+  if (!existing.exists) return { error: "Applicant not found." };
+  const oldUrl = String(existing.get(col) ?? "");
+  await applicantRef.update({ [col]: url });
+  const oldPath = filePathFromPrivateUrl(oldUrl);
+  if (oldPath) await deleteStaffFile(oldPath);
 
   revalidatePath(`/applicants/${applicantId}`);
   return { url };
@@ -194,33 +181,14 @@ export async function addApplicantOtherDoc(
   if (!file || file.size === 0) return { error: "No file provided" };
   if (!name) return { error: "Document name is required" };
 
-  const adminClient = createSupabaseAdminClient();
-  const ext = file.name.split(".").pop() ?? "pdf";
-  const path = `docs/${crypto.randomUUID()}.${ext}`;
-
-  const { error: uploadError } = await adminClient.storage
-    .from("applicant-photos")
-    .upload(path, file, { contentType: file.type, upsert: false });
-  if (uploadError) return { error: uploadError.message };
-
-  const url = adminClient.storage.from("applicant-photos").getPublicUrl(path).data.publicUrl;
-
-  const supabase = await createSupabaseServerClient();
-  const { data: row, error: fetchError } = await supabase
-    .from("applicants")
-    .select("other_docs")
-    .eq("id", applicantId)
-    .single();
-  if (fetchError) return { error: fetchError.message };
-
-  const existing: Array<{ name: string; url: string }> = (row as { other_docs: Array<{ name: string; url: string }> | null }).other_docs ?? [];
-  const updated = [...existing, { name, url }];
-
-  const { error: dbError } = await supabase
-    .from("applicants")
-    .update({ other_docs: updated })
-    .eq("id", applicantId);
-  if (dbError) return { error: dbError.message };
+  const path = await uploadStaffFile(file, "docs");
+  const url = privateFileUrl(path);
+  const db = await getStaffFirestore();
+  const ref = db.collection("applicants").doc(applicantId);
+  const snapshot = await ref.get();
+  if (!snapshot.exists) return { error: "Applicant not found." };
+  const existing = (snapshot.get("other_docs") as Array<{ name: string; url: string }> | null) ?? [];
+  await ref.update({ other_docs: [...existing, { name, url }] });
 
   revalidatePath(`/applicants/${applicantId}`);
   return { doc: { name, url } };
@@ -230,22 +198,14 @@ export async function removeApplicantOtherDoc(
   applicantId: string,
   url: string
 ): Promise<{ error?: string }> {
-  const supabase = await createSupabaseServerClient();
-  const { data: row, error: fetchError } = await supabase
-    .from("applicants")
-    .select("other_docs")
-    .eq("id", applicantId)
-    .single();
-  if (fetchError) return { error: fetchError.message };
-
-  const existing: Array<{ name: string; url: string }> = (row as { other_docs: Array<{ name: string; url: string }> | null }).other_docs ?? [];
-  const updated = existing.filter((d) => d.url !== url);
-
-  const { error: dbError } = await supabase
-    .from("applicants")
-    .update({ other_docs: updated })
-    .eq("id", applicantId);
-  if (dbError) return { error: dbError.message };
+  const db = await getStaffFirestore();
+  const ref = db.collection("applicants").doc(applicantId);
+  const snapshot = await ref.get();
+  if (!snapshot.exists) return { error: "Applicant not found." };
+  const existing = (snapshot.get("other_docs") as Array<{ name: string; url: string }> | null) ?? [];
+  await ref.update({ other_docs: existing.filter((document) => document.url !== url) });
+  const path = filePathFromPrivateUrl(url);
+  if (path) await deleteStaffFile(path);
 
   revalidatePath(`/applicants/${applicantId}`);
   return {};
@@ -272,13 +232,13 @@ export async function createScholar(
   _prevState: { error?: string } | null,
   formData: FormData
 ): Promise<{ error?: string }> {
-  const supabase = await createSupabaseServerClient();
+  const db = await getStaffFirestore();
   const payload = parseScholarFormData(formData);
   const photoFile = formData.get("profilePhoto") as File | null;
   let profile_photo_url: string | null = null;
   if (photoFile && photoFile.size > 0) profile_photo_url = await uploadProfilePhoto(photoFile);
-  const { error } = await supabase.from("scholars").insert({ ...payload, profile_photo_url });
-  if (error) return { error: error.message };
+  const ref = db.collection("scholars").doc();
+  await ref.set({ ...payload, profile_photo_url, created_at: new Date().toISOString() });
   revalidatePath("/scholars");
   redirect("/scholars");
 }
@@ -288,7 +248,7 @@ export async function updateScholar(
   _prevState: { error?: string } | null,
   formData: FormData
 ): Promise<{ error?: string }> {
-  const supabase = await createSupabaseServerClient();
+  const db = await getStaffFirestore();
   const payload = parseScholarFormData(formData);
   const photoFile = formData.get("profilePhoto") as File | null;
   let profile_photo_url: string | null = (formData.get("existingPhotoUrl") as string | null) || null;
@@ -296,17 +256,15 @@ export async function updateScholar(
     const uploaded = await uploadProfilePhoto(photoFile);
     if (uploaded) profile_photo_url = uploaded;
   }
-  const { error } = await supabase.from("scholars").update({ ...payload, profile_photo_url }).eq("id", id);
-  if (error) return { error: error.message };
+  await db.collection("scholars").doc(id).update({ ...payload, profile_photo_url });
   revalidatePath("/scholars");
   revalidatePath(`/scholars/${id}`);
   redirect(`/scholars/${id}`);
 }
 
 export async function deleteScholar(id: string): Promise<{ error?: string }> {
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.from("scholars").delete().eq("id", id);
-  if (error) return { error: error.message };
+  const db = await getStaffFirestore();
+  await db.collection("scholars").doc(id).delete();
   revalidatePath("/scholars");
   return {};
 }
@@ -319,24 +277,11 @@ export async function uploadScholarReportCard(
   const file = formData.get("file") as File | null;
   if (!file || file.size === 0) return { error: "No file provided" };
 
-  const adminClient = createSupabaseAdminClient();
-  const ext = file.name.split(".").pop() ?? "pdf";
-  const path = `reports/${crypto.randomUUID()}.${ext}`;
-
-  const { error: uploadError } = await adminClient.storage
-    .from("applicant-photos")
-    .upload(path, file, { contentType: file.type, upsert: false });
-  if (uploadError) return { error: uploadError.message };
-
-  const url = adminClient.storage.from("applicant-photos").getPublicUrl(path).data.publicUrl;
-
-  const supabase = await createSupabaseServerClient();
+  const path = await uploadStaffFile(file, "reports");
+  const url = privateFileUrl(path);
+  const db = await getStaffFirestore();
   const col = `term${term}_report_url`;
-  const { error: dbError } = await supabase
-    .from("scholars")
-    .update({ [col]: url })
-    .eq("id", scholarId);
-  if (dbError) return { error: dbError.message };
+  await db.collection("scholars").doc(scholarId).update({ [col]: url });
 
   revalidatePath(`/scholars/${scholarId}`);
   revalidatePath("/forms");
@@ -363,13 +308,13 @@ export async function createPastBeneficiary(
   _prevState: { error?: string } | null,
   formData: FormData
 ): Promise<{ error?: string }> {
-  const supabase = await createSupabaseServerClient();
+  const db = await getStaffFirestore();
   const payload = parseBeneficiaryFormData(formData);
   const photoFile = formData.get("profilePhoto") as File | null;
   let profile_photo_url: string | null = null;
   if (photoFile && photoFile.size > 0) profile_photo_url = await uploadProfilePhoto(photoFile);
-  const { error } = await supabase.from("past_beneficiaries").insert({ ...payload, profile_photo_url });
-  if (error) return { error: error.message };
+  const ref = db.collection("past_beneficiaries").doc();
+  await ref.set({ ...payload, profile_photo_url, created_at: new Date().toISOString() });
   revalidatePath("/past-beneficiaries");
   redirect("/past-beneficiaries");
 }
@@ -379,7 +324,7 @@ export async function updatePastBeneficiary(
   _prevState: { error?: string } | null,
   formData: FormData
 ): Promise<{ error?: string }> {
-  const supabase = await createSupabaseServerClient();
+  const db = await getStaffFirestore();
   const payload = parseBeneficiaryFormData(formData);
   const photoFile = formData.get("profilePhoto") as File | null;
   let profile_photo_url: string | null = (formData.get("existingPhotoUrl") as string | null) || null;
@@ -387,17 +332,15 @@ export async function updatePastBeneficiary(
     const uploaded = await uploadProfilePhoto(photoFile);
     if (uploaded) profile_photo_url = uploaded;
   }
-  const { error } = await supabase.from("past_beneficiaries").update({ ...payload, profile_photo_url }).eq("id", id);
-  if (error) return { error: error.message };
+  await db.collection("past_beneficiaries").doc(id).update({ ...payload, profile_photo_url });
   revalidatePath("/past-beneficiaries");
   revalidatePath(`/past-beneficiaries/${id}`);
   redirect(`/past-beneficiaries/${id}`);
 }
 
 export async function deletePastBeneficiary(id: string): Promise<{ error?: string }> {
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.from("past_beneficiaries").delete().eq("id", id);
-  if (error) return { error: error.message };
+  const db = await getStaffFirestore();
+  await db.collection("past_beneficiaries").doc(id).delete();
   revalidatePath("/past-beneficiaries");
   return {};
 }
@@ -407,12 +350,8 @@ export async function deletePastBeneficiary(id: string): Promise<{ error?: strin
 export async function deleteFormTemplate(
   id: string
 ): Promise<{ error?: string }> {
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase
-    .from("form_templates")
-    .delete()
-    .eq("id", id);
-  if (error) return { error: error.message };
+  const db = await getStaffFirestore();
+  await db.collection("form_templates").doc(id).delete();
 
   revalidatePath("/forms");
   return {};
@@ -423,9 +362,8 @@ export async function deleteFormTemplate(
 export async function saveSettings(
   settings: AppSettings
 ): Promise<{ error?: string }> {
-  const supabase = await createSupabaseServerClient();
+  const db = await getStaffFirestore();
   const payload = {
-    id: 1,
     scholarship_year: settings.scholarshipYear,
     app_open_date: settings.appOpenDate || null,
     app_close_date: settings.appCloseDate || null,
@@ -440,8 +378,7 @@ export async function saveSettings(
     scoring_character: settings.scoringCharacter,
     scoring_hardship: settings.scoringHardship,
   };
-  const { error } = await supabase.from("settings").upsert(payload, { onConflict: "id" });
-  if (error) return { error: error.message };
+  await db.collection("settings").doc("1").set(payload, { merge: true });
   revalidatePath("/settings");
   revalidatePath("/");
   return {};
@@ -450,9 +387,8 @@ export async function saveSettings(
 export async function recomputeAllScores(
   weights: Pick<AppSettings, "scoringChildStatus" | "scoringAcademic" | "scoringCharacter" | "scoringHardship">
 ): Promise<{ updated: number; error?: string }> {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.from("applicants").select("*");
-  if (error) return { updated: 0, error: error.message };
+  const db = await getStaffFirestore();
+  const snapshot = await db.collection("applicants").get();
 
   type Row = {
     id: string;
@@ -467,7 +403,8 @@ export async function recomputeAllScores(
 
   const { CHILD_STATUS_SCORES, ACADEMIC_SCORES, CHARACTER_SCORES } = await import("./scoring");
 
-  const updates = (data as Row[]).map((row) => {
+  const updates = snapshot.docs.map((document) => {
+    const row = { ...document.data(), id: document.id } as Row;
     const hardshipCount = [
       row.hardship_chronically_ill,
       row.hardship_distance_to_school,
@@ -485,12 +422,13 @@ export async function recomputeAllScores(
   });
 
   let updated = 0;
-  for (const u of updates) {
-    const { error: ue } = await supabase
-      .from("applicants")
-      .update({ total_score: u.total_score })
-      .eq("id", u.id);
-    if (!ue) updated++;
+  for (let index = 0; index < updates.length; index += 450) {
+    const batch = db.batch();
+    for (const update of updates.slice(index, index + 450)) {
+      batch.update(db.collection("applicants").doc(update.id), { total_score: update.total_score });
+    }
+    await batch.commit();
+    updated += Math.min(450, updates.length - index);
   }
 
   revalidatePath("/applicants");
@@ -501,15 +439,14 @@ export async function recomputeAllScores(
 // ─── CSV Export ───────────────────────────────────────────────────────────────
 
 export async function exportApplicantsCSV(): Promise<{ csv?: string; error?: string }> {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("applicants")
-    .select("first_name,last_name,email,institution,year_of_study,location,status,total_score,applied_date,rank")
-    .order("total_score", { ascending: false });
-  if (error) return { error: error.message };
+  const db = await getStaffFirestore();
+  const snapshot = await db.collection("applicants").get();
+  const data = snapshot.docs
+    .map((document) => document.data())
+    .sort((a, b) => Number(b.total_score ?? 0) - Number(a.total_score ?? 0));
 
   const header = "Name,Email,Institution,Grade,Location,Status,Score,Applied Date,Rank";
-  const rows = (data as Array<Record<string, string | number | null>>).map((r) =>
+  const rows = data.map((r) =>
     [
       `"${r.first_name} ${r.last_name}"`,
       r.email ?? "",
@@ -526,15 +463,14 @@ export async function exportApplicantsCSV(): Promise<{ csv?: string; error?: str
 }
 
 export async function exportScholarsCSV(): Promise<{ csv?: string; error?: string }> {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("scholars")
-    .select("first_name,last_name,school,grade,location,status,year_joined")
-    .order("created_at", { ascending: false });
-  if (error) return { error: error.message };
+  const db = await getStaffFirestore();
+  const snapshot = await db.collection("scholars").get();
+  const data = snapshot.docs
+    .map((document) => document.data())
+    .sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
 
   const header = "Name,School,Grade,Location,Status,Year Joined";
-  const rows = (data as Array<Record<string, string | number | null>>).map((r) =>
+  const rows = data.map((r) =>
     [
       `"${r.first_name} ${r.last_name}"`,
       `"${r.school ?? ""}"`,
@@ -548,15 +484,14 @@ export async function exportScholarsCSV(): Promise<{ csv?: string; error?: strin
 }
 
 export async function exportBeneficiariesCSV(): Promise<{ csv?: string; error?: string }> {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("past_beneficiaries")
-    .select("first_name,last_name,high_school,year_graduated,current_status,institution,field_of_study,location")
-    .order("year_graduated", { ascending: false });
-  if (error) return { error: error.message };
+  const db = await getStaffFirestore();
+  const snapshot = await db.collection("past_beneficiaries").get();
+  const data = snapshot.docs
+    .map((document) => document.data())
+    .sort((a, b) => Number(b.year_graduated ?? 0) - Number(a.year_graduated ?? 0));
 
   const header = "Name,High School,Year Graduated,Status,Institution,Field of Study,Location";
-  const rows = (data as Array<Record<string, string | number | null>>).map((r) =>
+  const rows = data.map((r) =>
     [
       `"${r.first_name} ${r.last_name}"`,
       `"${r.high_school ?? ""}"`,

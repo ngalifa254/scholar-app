@@ -1,4 +1,4 @@
-import { createSupabaseServerClient } from "./supabase";
+import { getStaffFirestore } from "./staff-firestore";
 import type {
   Applicant,
   AppSettings,
@@ -30,32 +30,24 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 export async function getSettings(): Promise<AppSettings> {
-  try {
-    const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase
-      .from("settings")
-      .select("*")
-      .eq("id", 1)
-      .single();
-    if (error || !data) return DEFAULT_SETTINGS;
-    return {
-      scholarshipYear: data.scholarship_year ?? DEFAULT_SETTINGS.scholarshipYear,
-      appOpenDate: data.app_open_date ?? "",
-      appCloseDate: data.app_close_date ?? "",
-      selectionDeadline: data.selection_deadline ?? "",
-      intakeQuota: data.intake_quota ?? 10,
-      orgName: data.org_name ?? DEFAULT_SETTINGS.orgName,
-      orgTagline: data.org_tagline ?? DEFAULT_SETTINGS.orgTagline,
-      orgEmail: data.org_email ?? "",
-      orgPhone: data.org_phone ?? "",
-      scoringChildStatus: data.scoring_child_status ?? 40,
-      scoringAcademic: data.scoring_academic ?? 30,
-      scoringCharacter: data.scoring_character ?? 20,
-      scoringHardship: data.scoring_hardship ?? 10,
-    };
-  } catch {
-    return DEFAULT_SETTINGS;
-  }
+  const db = await getStaffFirestore();
+  const snapshot = await db.collection("settings").doc("1").get();
+  const data = snapshot.data() ?? {};
+  return {
+    scholarshipYear: data.scholarship_year ?? DEFAULT_SETTINGS.scholarshipYear,
+    appOpenDate: data.app_open_date ?? "",
+    appCloseDate: data.app_close_date ?? "",
+    selectionDeadline: data.selection_deadline ?? "",
+    intakeQuota: data.intake_quota ?? 10,
+    orgName: data.org_name ?? DEFAULT_SETTINGS.orgName,
+    orgTagline: data.org_tagline ?? DEFAULT_SETTINGS.orgTagline,
+    orgEmail: data.org_email ?? "",
+    orgPhone: data.org_phone ?? "",
+    scoringChildStatus: data.scoring_child_status ?? 40,
+    scoringAcademic: data.scoring_academic ?? 30,
+    scoringCharacter: data.scoring_character ?? 20,
+    scoringHardship: data.scoring_hardship ?? 10,
+  };
 }
 
 type ApplicantRow = {
@@ -144,13 +136,8 @@ export async function getApplicants(opts?: {
   sortKey?: string;
   sortDir?: "asc" | "desc";
 }): Promise<Applicant[]> {
-  const supabase = await createSupabaseServerClient();
-  let query = supabase.from("applicants").select("*");
-
-  if (opts?.status && opts.status !== "all") {
-    query = query.eq("status", opts.status);
-  }
-
+  const db = await getStaffFirestore();
+  const snapshot = await db.collection("applicants").get();
   const colMap: Record<string, string> = {
     firstName: "first_name",
     institution: "institution",
@@ -159,12 +146,16 @@ export async function getApplicants(opts?: {
     status: "status",
   };
   const col = colMap[opts?.sortKey ?? "total_score"] ?? "total_score";
-  query = query.order(col, { ascending: opts?.sortDir === "asc" });
-
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-
-  let results = (data as ApplicantRow[]).map(rowToApplicant);
+  const direction = opts?.sortDir === "asc" ? 1 : -1;
+  let results = snapshot.docs
+    .map((document) => rowToApplicant({ ...document.data(), id: document.id } as ApplicantRow))
+    .filter((applicant) => !opts?.status || opts.status === "all" || applicant.status === opts.status)
+    .sort((a, b) => {
+      const first = a[col as keyof Applicant] as string | number;
+      const second = b[col as keyof Applicant] as string | number;
+      if (first === second) return 0;
+      return (first < second ? -1 : 1) * direction;
+    });
 
   if (opts?.search) {
     const q = opts.search.toLowerCase();
@@ -180,36 +171,28 @@ export async function getApplicants(opts?: {
 }
 
 export async function getApplicantById(id: string): Promise<Applicant | null> {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("applicants")
-    .select("*")
-    .eq("id", id)
-    .single();
-  if (error) return null;
-  return rowToApplicant(data as ApplicantRow);
+  const db = await getStaffFirestore();
+  const document = await db.collection("applicants").doc(id).get();
+  return document.exists
+    ? rowToApplicant({ ...document.data(), id: document.id } as ApplicantRow)
+    : null;
 }
 
 export async function getApplicantsRanked(): Promise<Applicant[]> {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("applicants")
-    .select("*")
-    .not("rank", "is", null)
-    .order("rank", { ascending: true });
-  if (error) throw new Error(error.message);
-  return (data as ApplicantRow[]).map(rowToApplicant);
+  const db = await getStaffFirestore();
+  const snapshot = await db.collection("applicants").get();
+  return snapshot.docs
+    .map((document) => rowToApplicant({ ...document.data(), id: document.id } as ApplicantRow))
+    .filter((applicant) => applicant.rank != null)
+    .sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0));
 }
 
 export async function getKpiData() {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("applicants")
-    .select("status, total_score, applied_date");
-  if (error) throw new Error(error.message);
-
+  const db = await getStaffFirestore();
+  const snapshot = await db.collection("applicants").get();
   type KpiRow = Pick<ApplicantRow, "status" | "total_score" | "applied_date">;
-  const all = data as KpiRow[];
+  const all = snapshot.docs.map((document) => document.data() as KpiRow);
+  const latest = all.map((row) => row.applied_date ?? "").sort().at(-1) ?? "";
   const totalApplicants = all.length;
 
   return {
@@ -221,7 +204,7 @@ export async function getKpiData() {
     averageScore: totalApplicants
       ? all.reduce((s, a) => s + Number(a.total_score), 0) / totalApplicants
       : 0,
-    lastApplicationDate: all.at(-1)?.applied_date ?? "",
+    lastApplicationDate: latest,
   };
 }
 
@@ -268,12 +251,12 @@ function rowToScholar(row: ScholarRow): Scholar {
 }
 
 export async function getScholars(opts?: { search?: string; status?: ScholarStatus | "all" }): Promise<Scholar[]> {
-  const supabase = await createSupabaseServerClient();
-  let query = supabase.from("scholars").select("*").order("created_at", { ascending: false });
-  if (opts?.status && opts.status !== "all") query = query.eq("status", opts.status);
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  let results = (data as ScholarRow[]).map(rowToScholar);
+  const db = await getStaffFirestore();
+  const snapshot = await db.collection("scholars").get();
+  let results = snapshot.docs
+    .map((document) => rowToScholar({ ...document.data(), id: document.id } as ScholarRow))
+    .filter((scholar) => !opts?.status || opts.status === "all" || scholar.status === opts.status)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   if (opts?.search) {
     const q = opts.search.toLowerCase();
     results = results.filter(
@@ -284,10 +267,11 @@ export async function getScholars(opts?: { search?: string; status?: ScholarStat
 }
 
 export async function getScholarById(id: string): Promise<Scholar | null> {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.from("scholars").select("*").eq("id", id).single();
-  if (error) return null;
-  return rowToScholar(data as ScholarRow);
+  const db = await getStaffFirestore();
+  const document = await db.collection("scholars").doc(id).get();
+  return document.exists
+    ? rowToScholar({ ...document.data(), id: document.id } as ScholarRow)
+    : null;
 }
 
 // ─── Past Beneficiaries ───────────────────────────────────────────────────────
@@ -325,12 +309,12 @@ function rowToBeneficiary(row: PastBeneficiaryRow): PastBeneficiary {
 }
 
 export async function getPastBeneficiaries(opts?: { search?: string; status?: BeneficiaryStatus | "all" }): Promise<PastBeneficiary[]> {
-  const supabase = await createSupabaseServerClient();
-  let query = supabase.from("past_beneficiaries").select("*").order("year_graduated", { ascending: false });
-  if (opts?.status && opts.status !== "all") query = query.eq("current_status", opts.status);
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  let results = (data as PastBeneficiaryRow[]).map(rowToBeneficiary);
+  const db = await getStaffFirestore();
+  const snapshot = await db.collection("past_beneficiaries").get();
+  let results = snapshot.docs
+    .map((document) => rowToBeneficiary({ ...document.data(), id: document.id } as PastBeneficiaryRow))
+    .filter((beneficiary) => !opts?.status || opts.status === "all" || beneficiary.currentStatus === opts.status)
+    .sort((a, b) => b.yearGraduated - a.yearGraduated);
   if (opts?.search) {
     const q = opts.search.toLowerCase();
     results = results.filter(
@@ -341,23 +325,22 @@ export async function getPastBeneficiaries(opts?: { search?: string; status?: Be
 }
 
 export async function getPastBeneficiaryById(id: string): Promise<PastBeneficiary | null> {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.from("past_beneficiaries").select("*").eq("id", id).single();
-  if (error) return null;
-  return rowToBeneficiary(data as PastBeneficiaryRow);
+  const db = await getStaffFirestore();
+  const document = await db.collection("past_beneficiaries").doc(id).get();
+  return document.exists
+    ? rowToBeneficiary({ ...document.data(), id: document.id } as PastBeneficiaryRow)
+    : null;
 }
 
 // ─── Form Templates ───────────────────────────────────────────────────────────
 
 export async function getFormTemplates(): Promise<FormTemplate[]> {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("form_templates")
-    .select("*")
-    .order("created_at", { ascending: false });
-  if (error) throw new Error(error.message);
-
-  return (data as FormTemplateRow[]).map((row) => ({
+  const db = await getStaffFirestore();
+  const snapshot = await db.collection("form_templates").get();
+  return snapshot.docs
+    .map((document) => ({ ...document.data(), id: document.id } as FormTemplateRow))
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .map((row) => ({
     id: row.id,
     name: row.name,
     description: row.description,

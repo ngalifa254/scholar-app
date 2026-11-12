@@ -180,7 +180,7 @@ export default function NewApplicantPage() {
                   className="group relative w-20 h-20 rounded-full overflow-hidden bg-primary/10 flex items-center justify-center border-2 border-dashed border-primary/30 hover:border-primary/60 transition-colors"
                 >
                   {photoPreview ? (
-                    <Image src={photoPreview} alt="Preview" fill className="object-cover" sizes="80px" />
+                    <Image src={photoPreview} alt="Preview" fill unoptimized className="object-cover" sizes="80px" />
                   ) : (
                     <Camera className="w-7 h-7 text-primary/50 group-hover:text-primary/80 transition-colors" />
                   )}

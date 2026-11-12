@@ -12,8 +12,10 @@ import {
   GraduationCap,
   BookOpen,
   Award,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 
 const NAV_GROUPS = [
   {
@@ -47,10 +49,17 @@ const NAV_GROUPS = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
 
   function isActive(href: string) {
     if (href === "/") return pathname === "/";
     return pathname === href || pathname.startsWith(href + "/");
+  }
+
+  async function handleSignOut() {
+    await fetch("/api/auth/session", { method: "DELETE" });
+    router.replace("/login");
+    router.refresh();
   }
 
   return (
@@ -151,32 +160,15 @@ export function Sidebar() {
         className="p-2 shrink-0"
         style={{ borderTop: "1px solid var(--sidebar-border)" }}
       >
-        <div
-          className="flex items-center gap-2.5 px-2 py-2 rounded-md cursor-pointer transition-all"
+        <button
+          type="button"
+          onClick={handleSignOut}
+          className="w-full flex items-center gap-2.5 px-2 py-2 rounded-md text-sm transition-colors hover:bg-white/10"
           style={{ color: "var(--sidebar-muted)" }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLElement).style.background = "var(--sidebar-hover)";
-            (e.currentTarget as HTMLElement).style.color = "var(--sidebar-fg)";
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLElement).style.background = "transparent";
-            (e.currentTarget as HTMLElement).style.color = "var(--sidebar-muted)";
-          }}
         >
-          <div
-            className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-            style={{ background: "var(--sidebar-accent)", color: "#fff" }}
-          >
-            AD
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium truncate" style={{ color: "var(--sidebar-fg)" }}>
-              Admin User
-            </p>
-            <p className="text-[10px] truncate">admin@wahomefoundation.org</p>
-          </div>
-          <Settings className="w-3.5 h-3.5 shrink-0" />
-        </div>
+          <LogOut className="w-4 h-4 shrink-0" />
+          <span>Sign out</span>
+        </button>
       </div>
     </aside>
   );

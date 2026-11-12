@@ -26,6 +26,7 @@ export function ApplicantAvatar({
           src={photoUrl}
           alt={`${firstName} ${lastName}`}
           fill
+          unoptimized
           className="object-cover"
           sizes={`${size}px`}
         />
