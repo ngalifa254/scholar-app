@@ -6,8 +6,28 @@ import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 
 function getAdminApp() {
-  const json = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  if (!json) throw new Error("FIREBASE_SERVICE_ACCOUNT_JSON is not configured.");
+  const rawJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (!rawJson) throw new Error("FIREBASE_SERVICE_ACCOUNT_JSON is not configured.");
+
+  let json = rawJson.trim();
+  const firstCharacter = json[0];
+  const lastCharacter = json[json.length - 1];
+  const hasWrappingQuotes =
+    (firstCharacter === '"' && lastCharacter === '"') ||
+    (firstCharacter === "'" && lastCharacter === "'");
+
+  if (hasWrappingQuotes) {
+    if (firstCharacter === '"') {
+      try {
+        const unwrapped = JSON.parse(json) as unknown;
+        json = typeof unwrapped === "string" ? unwrapped : json.slice(1, -1);
+      } catch {
+        json = json.slice(1, -1);
+      }
+    } else {
+      json = json.slice(1, -1);
+    }
+  }
 
   let serviceAccount: {
     project_id?: string;

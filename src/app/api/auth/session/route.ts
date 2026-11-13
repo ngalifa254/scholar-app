@@ -11,17 +11,18 @@ function isSameOrigin(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!isSameOrigin(request)) {
-    return NextResponse.json({ code: "INVALID_REQUEST_ORIGIN", error: "Invalid request origin." }, { status: 403 });
-  }
-
-  const body = await request.json().catch(() => null);
-  if (typeof body?.idToken !== "string" || body.idToken.length > 10_000) {
-    return NextResponse.json({ code: "MISSING_SIGN_IN_TOKEN", error: "Sign-in token is missing." }, { status: 400 });
-  }
-
   try {
+    if (!isSameOrigin(request)) {
+      return NextResponse.json({ code: "INVALID_REQUEST_ORIGIN", error: "Invalid request origin." }, { status: 403 });
+    }
+
+    const body = await request.json();
+    if (typeof body?.idToken !== "string" || body.idToken.length > 10_000) {
+      return NextResponse.json({ code: "MISSING_SIGN_IN_TOKEN", error: "Sign-in token is missing." }, { status: 400 });
+    }
+
     const auth = getFirebaseAdminAuth();
+
     const decoded = await auth.verifyIdToken(body.idToken, true);
     const authTime = Number(decoded.auth_time ?? 0);
     if (Date.now() / 1000 - authTime > 5 * 60) {
@@ -44,29 +45,31 @@ export async function POST(request: NextRequest) {
       maxAge: expiresIn / 1000,
     });
     return response;
-  } catch (cause) {
-    const detail = cause && typeof cause === "object"
-      ? cause as { code?: unknown; message?: unknown }
-      : null;
+  } catch (error) {
     return NextResponse.json({
-      code: typeof detail?.code === "string" ? detail.code : "SESSION_CREATION_FAILED",
-      error: typeof detail?.message === "string" ? detail.message : "Unable to create a staff session.",
-    }, { status: 401 });
+      error: error instanceof Error ? error.message : String(error),
+    }, { status: 500 });
   }
 }
 
 export async function DELETE(request: NextRequest) {
-  if (!isSameOrigin(request)) {
-    return NextResponse.json({ code: "INVALID_REQUEST_ORIGIN", error: "Invalid request origin." }, { status: 403 });
-  }
+  try {
+    if (!isSameOrigin(request)) {
+      return NextResponse.json({ code: "INVALID_REQUEST_ORIGIN", error: "Invalid request origin." }, { status: 403 });
+    }
 
-  const response = NextResponse.json({ ok: true });
-  response.cookies.set(STAFF_SESSION_COOKIE, "", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 0,
-  });
-  return response;
+    const response = NextResponse.json({ ok: true });
+    response.cookies.set(STAFF_SESSION_COOKIE, "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    });
+    return response;
+  } catch (error) {
+    return NextResponse.json({
+      error: error instanceof Error ? error.message : String(error),
+    }, { status: 500 });
+  }
 }
