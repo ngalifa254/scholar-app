@@ -10,12 +10,9 @@ import {
   FileText,
   Settings,
   GraduationCap,
-  BookOpen,
   Award,
-  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useRouter } from "next/navigation";
 
 const NAV_GROUPS = [
   {
@@ -49,48 +46,47 @@ const NAV_GROUPS = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
 
   function isActive(href: string) {
     if (href === "/") return pathname === "/";
     return pathname === href || pathname.startsWith(href + "/");
   }
 
-  async function handleSignOut() {
-    await fetch("/api/auth/session", { method: "DELETE" });
-    router.replace("/login");
-    router.refresh();
-  }
-
   return (
     <aside
-      className="w-60 min-h-screen flex flex-col shrink-0"
+      className="sticky top-0 flex h-screen w-16 shrink-0 flex-col transition-[width] duration-200 lg:w-52"
       style={{ background: "var(--sidebar-bg)", borderRight: "1px solid var(--sidebar-border)" }}
     >
       {/* Logo */}
       <div
-        className="flex flex-col items-start gap-1.5 px-4 py-3 shrink-0"
+        className="flex shrink-0 flex-col items-center gap-1.5 px-2 py-3 lg:items-start lg:px-4"
         style={{ borderBottom: "1px solid var(--sidebar-border)" }}
       >
         <Image
           src="/wahome-logo.png"
           alt="Wahome Foundation"
-          width={155}
-          height={45}
+          width={40}
+          height={40}
           priority
-          className="object-contain"
+          className="h-9 w-9 object-cover object-left lg:hidden"
         />
-        <span className="font-semibold text-sm tracking-tight" style={{ color: "var(--sidebar-fg)" }}>
-          Student Center
-        </span>
+        <Image
+          src="/wahome-logo.png"
+          alt="Wahome Foundation"
+          width={120}
+          height={35}
+          priority
+          className="hidden h-auto w-[120px] object-contain lg:block"
+        />
+        <span className="hidden text-xs tracking-wide text-muted-foreground lg:block">Student Center</span>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-2 py-4 space-y-5 overflow-y-auto">
+      <nav className="space-y-5 overflow-y-auto px-1 py-4 lg:px-2">
         {NAV_GROUPS.map((group) => (
           <div key={group.label}>
             <p
-              className="px-2 mb-1 text-[10px] font-semibold uppercase tracking-widest"
+              className="mb-1 hidden px-2 text-[10px] font-semibold uppercase tracking-widest lg:block"
               style={{ color: "var(--sidebar-muted)" }}
             >
               {group.label}
@@ -102,17 +98,18 @@ export function Sidebar() {
                   <li key={item.href}>
                     <Link
                       href={item.href}
+                      title={item.label}
+                      aria-label={item.label}
                       className={cn(
-                        "flex items-center gap-2.5 px-2 py-2 rounded-md text-sm transition-all duration-100",
+                        "flex items-center justify-center gap-2.5 border-l-2 border-transparent px-0 py-2 text-sm transition-all duration-100 lg:justify-start lg:px-2",
                         active
-                          ? "font-medium"
-                          : "hover:opacity-100"
+                          ? "border-l-primary font-medium text-primary"
+                          : "hover:text-foreground"
                       )}
                       style={
                         active
                           ? {
-                              background: "var(--sidebar-active)",
-                              color: "var(--sidebar-fg)",
+                              color: "var(--sidebar-accent)",
                             }
                           : {
                               color: "var(--sidebar-muted)",
@@ -120,16 +117,12 @@ export function Sidebar() {
                       }
                       onMouseEnter={(e) => {
                         if (!active) {
-                          (e.currentTarget as HTMLElement).style.background =
-                            "var(--sidebar-hover)";
                           (e.currentTarget as HTMLElement).style.color =
                             "var(--sidebar-fg)";
                         }
                       }}
                       onMouseLeave={(e) => {
                         if (!active) {
-                          (e.currentTarget as HTMLElement).style.background =
-                            "transparent";
                           (e.currentTarget as HTMLElement).style.color =
                             "var(--sidebar-muted)";
                         }
@@ -139,13 +132,7 @@ export function Sidebar() {
                         className="w-4 h-4 shrink-0"
                         style={active ? { color: "var(--sidebar-accent)" } : {}}
                       />
-                      <span>{item.label}</span>
-                      {active && (
-                        <span
-                          className="ml-auto w-1.5 h-1.5 rounded-full"
-                          style={{ background: "var(--sidebar-accent)" }}
-                        />
-                      )}
+                      <span className="hidden lg:inline">{item.label}</span>
                     </Link>
                   </li>
                 );
@@ -155,21 +142,6 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* User */}
-      <div
-        className="p-2 shrink-0"
-        style={{ borderTop: "1px solid var(--sidebar-border)" }}
-      >
-        <button
-          type="button"
-          onClick={handleSignOut}
-          className="w-full flex items-center gap-2.5 px-2 py-2 rounded-md text-sm transition-colors hover:bg-white/10"
-          style={{ color: "var(--sidebar-muted)" }}
-        >
-          <LogOut className="w-4 h-4 shrink-0" />
-          <span>Sign out</span>
-        </button>
-      </div>
     </aside>
   );
 }

@@ -43,6 +43,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { deleteApplicant } from "@/lib/actions";
 import {
   getStatusConfig,
@@ -69,6 +70,7 @@ export default function ApplicantsClient({ initialApplicants }: Props) {
     dir: "desc",
   });
   const [deleteTarget, setDeleteTarget] = useState<Applicant | null>(null);
+  const [detailTarget, setDetailTarget] = useState<Applicant | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -195,7 +197,7 @@ export default function ApplicantsClient({ initialApplicants }: Props) {
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0, transition: { delay: 0.1 } }}
-        className="rounded-lg border border-border bg-card overflow-hidden"
+        className="overflow-x-auto border-y border-border"
       >
         <Table>
           <TableHeader>
@@ -230,7 +232,22 @@ export default function ApplicantsClient({ initialApplicants }: Props) {
               filtered.map((app, i) => {
                 const status = getStatusConfig(app.status);
                 return (
-                  <TableRow key={app.id} className="group">
+                  <TableRow
+                    key={app.id}
+                    className="group cursor-pointer hover:bg-muted/30"
+                    tabIndex={0}
+                    onClick={(event) => {
+                      if ((event.target as HTMLElement).closest("a,button")) return;
+                      setDetailTarget(app);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget) return;
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setDetailTarget(app);
+                      }
+                    }}
+                  >
                     <TableCell className="text-muted-foreground text-xs font-mono">
                       {i + 1}
                     </TableCell>
@@ -243,12 +260,13 @@ export default function ApplicantsClient({ initialApplicants }: Props) {
                           size={32}
                         />
                         <div className="min-w-0">
-                          <Link
-                            href={`/applicants/${app.id}`}
-                            className="text-sm font-medium hover:text-primary transition-colors truncate block"
+                          <button
+                            type="button"
+                            onClick={() => setDetailTarget(app)}
+                            className="text-left text-sm font-medium hover:text-primary transition-colors truncate block"
                           >
                             {app.firstName} {app.lastName}
-                          </Link>
+                          </button>
                           <p className="text-xs text-muted-foreground truncate">{app.location || app.nationality}</p>
                         </div>
                       </div>
@@ -263,7 +281,7 @@ export default function ApplicantsClient({ initialApplicants }: Props) {
                       </span>
                     </TableCell>
                     <TableCell className="hidden lg:table-cell">
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-violet-50 border border-violet-200 text-violet-700 font-medium uppercase">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-secondary border border-border text-secondary-foreground font-medium uppercase">
                         {app.academicMerit?.toUpperCase() ?? "—"}
                       </span>
                     </TableCell>
@@ -319,6 +337,57 @@ export default function ApplicantsClient({ initialApplicants }: Props) {
           </TableBody>
         </Table>
       </motion.div>
+
+      <Sheet open={!!detailTarget} onOpenChange={(open) => { if (!open) setDetailTarget(null); }}>
+        <SheetContent>
+          {detailTarget && (
+            <div className="space-y-6 pt-5">
+              <div className="flex items-center gap-3 pr-8">
+                <ApplicantAvatar
+                  firstName={detailTarget.firstName}
+                  lastName={detailTarget.lastName}
+                  photoUrl={detailTarget.profilePhotoUrl}
+                  size={52}
+                />
+                <div className="min-w-0">
+                  <SheetTitle className="truncate text-lg font-semibold">
+                    {detailTarget.firstName} {detailTarget.lastName}
+                  </SheetTitle>
+                  <SheetDescription className="truncate">{detailTarget.email}</SheetDescription>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${getStatusConfig(detailTarget.status).className}`}>
+                  {getStatusConfig(detailTarget.status).label}
+                </span>
+                <span className="rounded-full border border-border bg-secondary px-2.5 py-1 text-xs text-secondary-foreground">
+                  Score {detailTarget.totalScore.toFixed(1)}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-4 border-y border-border py-4 text-sm">
+                <div><p className="text-xs text-muted-foreground">School</p><p className="mt-1 font-medium">{detailTarget.institution}</p></div>
+                <div><p className="text-xs text-muted-foreground">Program</p><p className="mt-1 font-medium">{detailTarget.program}</p></div>
+                <div><p className="text-xs text-muted-foreground">Year of study</p><p className="mt-1 font-medium">{detailTarget.yearOfStudy}</p></div>
+                <div><p className="text-xs text-muted-foreground">Applied</p><p className="mt-1 font-medium">{formatDate(detailTarget.appliedDate)}</p></div>
+                <div><p className="text-xs text-muted-foreground">Child status</p><p className="mt-1 font-medium">{CHILD_STATUS_LABELS[detailTarget.childStatus] ?? detailTarget.childStatus}</p></div>
+                <div><p className="text-xs text-muted-foreground">Academic merit</p><p className="mt-1 font-medium">{ACADEMIC_LABELS[detailTarget.academicMerit] ?? detailTarget.academicMerit}</p></div>
+                <div><p className="text-xs text-muted-foreground">Guardian</p><p className="mt-1 font-medium">{detailTarget.guardianName || "—"}</p></div>
+                <div><p className="text-xs text-muted-foreground">Guardian contact</p><p className="mt-1 font-medium">{detailTarget.guardianContact || "—"}</p></div>
+              </div>
+              {detailTarget.notes && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Notes</p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm">{detailTarget.notes}</p>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Button asChild className="flex-1"><Link href={`/applicants/${detailTarget.id}`}>Open full profile</Link></Button>
+                <Button asChild variant="outline"><Link href={`/applicants/${detailTarget.id}/edit`}>Edit</Link></Button>
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) { setDeleteTarget(null); setDeleteError(null); } }}>

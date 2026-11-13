@@ -43,14 +43,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { ApplicantAvatar } from "@/components/ui/applicant-avatar";
 import { deleteScholar } from "@/lib/actions";
 import type { Scholar, ScholarStatus } from "@/types";
 
 const STATUS_CONFIG: Record<ScholarStatus, { label: string; className: string }> = {
-  active:    { label: "Active",    className: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
-  completed: { label: "Completed", className: "bg-blue-50 text-blue-700 border border-blue-200" },
-  deferred:  { label: "Deferred",  className: "bg-amber-50 text-amber-700 border border-amber-200" },
+  active:    { label: "Active",    className: "bg-primary/10 text-primary border border-primary/20" },
+  completed: { label: "Graduated", className: "bg-muted text-muted-foreground border border-border" },
+  deferred:  { label: "On hold",   className: "bg-amber-50 text-amber-800 border border-amber-200" },
 };
 
 type SortKey = "firstName" | "school" | "yearJoined" | "status";
@@ -69,6 +70,7 @@ export default function ScholarsClient({ initialScholars }: Props) {
     dir: "asc",
   });
   const [deleteTarget, setDeleteTarget] = useState<Scholar | null>(null);
+  const [detailTarget, setDetailTarget] = useState<Scholar | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -189,7 +191,7 @@ export default function ScholarsClient({ initialScholars }: Props) {
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0, transition: { delay: 0.1 } }}
-        className="rounded-lg border border-border bg-card overflow-hidden"
+        className="overflow-x-auto border-y border-border"
       >
         <Table>
           <TableHeader>
@@ -236,7 +238,22 @@ export default function ScholarsClient({ initialScholars }: Props) {
               filtered.map((scholar, i) => {
                 const cfg = STATUS_CONFIG[scholar.status] ?? STATUS_CONFIG.active;
                 return (
-                  <TableRow key={scholar.id} className="group">
+                  <TableRow
+                    key={scholar.id}
+                    className="group cursor-pointer hover:bg-muted/30"
+                    tabIndex={0}
+                    onClick={(event) => {
+                      if ((event.target as HTMLElement).closest("a,button")) return;
+                      setDetailTarget(scholar);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget) return;
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setDetailTarget(scholar);
+                      }
+                    }}
+                  >
                     <TableCell className="text-muted-foreground text-xs font-mono">
                       {i + 1}
                     </TableCell>
@@ -249,12 +266,13 @@ export default function ScholarsClient({ initialScholars }: Props) {
                           size={32}
                         />
                         <div className="min-w-0">
-                          <Link
-                            href={`/scholars/${scholar.id}`}
-                            className="text-sm font-medium hover:text-primary transition-colors truncate block"
+                          <button
+                            type="button"
+                            onClick={() => setDetailTarget(scholar)}
+                            className="text-left text-sm font-medium hover:text-primary transition-colors truncate block"
                           >
                             {scholar.firstName} {scholar.lastName}
-                          </Link>
+                          </button>
                           <p className="text-xs text-muted-foreground truncate">
                             {scholar.location}
                           </p>
@@ -320,6 +338,49 @@ export default function ScholarsClient({ initialScholars }: Props) {
           </TableBody>
         </Table>
       </motion.div>
+
+      <Sheet open={!!detailTarget} onOpenChange={(open) => { if (!open) setDetailTarget(null); }}>
+        <SheetContent>
+          {detailTarget && (
+            <div className="space-y-6 pt-5">
+              <div className="flex items-center gap-3 pr-8">
+                <ApplicantAvatar
+                  firstName={detailTarget.firstName}
+                  lastName={detailTarget.lastName}
+                  photoUrl={detailTarget.profilePhotoUrl}
+                  size={52}
+                />
+                <div className="min-w-0">
+                  <SheetTitle className="truncate text-lg font-semibold">
+                    {detailTarget.firstName} {detailTarget.lastName}
+                  </SheetTitle>
+                  <SheetDescription className="truncate">{detailTarget.school}</SheetDescription>
+                </div>
+              </div>
+              <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_CONFIG[detailTarget.status]?.className ?? STATUS_CONFIG.active.className}`}>
+                {STATUS_CONFIG[detailTarget.status]?.label ?? STATUS_CONFIG.active.label}
+              </span>
+              <div className="grid grid-cols-2 gap-4 border-y border-border py-4 text-sm">
+                <div><p className="text-xs text-muted-foreground">Grade</p><p className="mt-1 font-medium">{detailTarget.grade}</p></div>
+                <div><p className="text-xs text-muted-foreground">Year joined</p><p className="mt-1 font-medium">{detailTarget.yearJoined || "—"}</p></div>
+                <div><p className="text-xs text-muted-foreground">Location</p><p className="mt-1 font-medium">{detailTarget.location || "—"}</p></div>
+                <div><p className="text-xs text-muted-foreground">Guardian</p><p className="mt-1 font-medium">{detailTarget.guardianName || "—"}</p></div>
+                <div className="col-span-2"><p className="text-xs text-muted-foreground">Guardian contact</p><p className="mt-1 font-medium">{detailTarget.guardianContact || "—"}</p></div>
+              </div>
+              {detailTarget.notes && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Notes</p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm">{detailTarget.notes}</p>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Button asChild className="flex-1"><Link href={`/scholars/${detailTarget.id}`}>Open full profile</Link></Button>
+                <Button asChild variant="outline"><Link href={`/scholars/${detailTarget.id}/edit`}>Edit</Link></Button>
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
 
       {/* Delete Confirmation Dialog */}
       <Dialog

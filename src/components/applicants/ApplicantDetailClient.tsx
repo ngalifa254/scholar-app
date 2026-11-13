@@ -189,7 +189,7 @@ export default function ApplicantDetailClient({ applicant: app }: Props) {
                   {app.totalScore.toFixed(0)}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">Total Score</p>
-                <p className="text-xs font-medium mt-1 uppercase tracking-wide text-violet-600">
+                <p className="text-xs font-medium mt-1 uppercase tracking-wide text-muted-foreground">
                   {app.academicMerit?.toUpperCase() ?? "—"}
                 </p>
               </div>
@@ -223,7 +223,7 @@ export default function ApplicantDetailClient({ applicant: app }: Props) {
                 <CardContent className="space-y-3">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">CBC Level</span>
-                    <span className="font-semibold text-violet-700 uppercase">{app.academicMerit?.toUpperCase() ?? "—"}</span>
+                    <span className="font-semibold text-foreground uppercase">{app.academicMerit?.toUpperCase() ?? "—"}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Performance</span>
@@ -277,16 +277,16 @@ export default function ApplicantDetailClient({ applicant: app }: Props) {
                 <CardContent className="space-y-3">
                   <div className="flex flex-wrap gap-1.5">
                     {app.hardshipChronicallyIll && (
-                      <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">Ill family member</span>
+                      <span className="text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full">Ill family member</span>
                     )}
                     {app.hardshipDistanceToSchool && (
-                      <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">Far from school</span>
+                      <span className="text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full">Far from school</span>
                     )}
                     {app.hardshipHeavyChores && (
-                      <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">Heavy chores</span>
+                      <span className="text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full">Heavy chores</span>
                     )}
                     {app.hardshipNoCleanWater && (
-                      <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">No water/power</span>
+                      <span className="text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full">No water/power</span>
                     )}
                     {hardshipCount === 0 && (
                       <span className="text-xs text-muted-foreground">None recorded</span>

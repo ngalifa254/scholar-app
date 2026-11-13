@@ -10,14 +10,14 @@ export default async function DashboardPage() {
     getFormTemplates(),
   ]);
 
-  const top3 = applicants
-    .filter((a) => a.rank && a.rank <= 3)
-    .sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99));
+  const selectedApplicants = applicants
+    .filter((applicant) => applicant.status === "selected")
+    .sort((a, b) => b.totalScore - a.totalScore);
 
   return (
     <DashboardClient
       scholars={scholars}
-      top3={top3}
+      selectedApplicants={selectedApplicants}
       kpi={kpi}
       scholarCount={scholars.length}
       beneficiaryCount={beneficiaries.length}

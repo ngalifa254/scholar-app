@@ -10,8 +10,8 @@ import { formatDate } from "@/lib/utils";
 import type { PastBeneficiary, BeneficiaryStatus } from "@/types";
 
 const STATUS_CONFIG: Record<BeneficiaryStatus, { label: string; className: string }> = {
-  university: { label: "In University", className: "bg-blue-50 text-blue-700 border border-blue-200" },
-  career:     { label: "In Career",     className: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
+  university: { label: "In University", className: "bg-muted text-muted-foreground border border-border" },
+  career:     { label: "In Career",     className: "bg-muted text-muted-foreground border border-border" },
   other:      { label: "Other",         className: "bg-muted text-muted-foreground border border-border" },
 };
 

@@ -1,6 +1,7 @@
-const { app, BrowserWindow } = require("electron");
+const { app, BrowserWindow, Menu } = require("electron");
 const path = require("node:path");
 
+Menu.setApplicationMenu(null);
 app.setPath(
   "userData",
   path.join(app.getPath("appData"), "WahomeFoundation", "StudentCenter")
@@ -39,6 +40,8 @@ function createWindow() {
     height: 960,
     minWidth: 900,
     minHeight: 640,
+    autoHideMenuBar: true,
+    icon: path.join(__dirname, "assets", "wahome.ico"),
     show: false,
     webPreferences: {
       nodeIntegration: false,

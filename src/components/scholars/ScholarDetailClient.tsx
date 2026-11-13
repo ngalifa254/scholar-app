@@ -23,9 +23,9 @@ import { uploadScholarReportCard } from "@/lib/actions";
 import type { Scholar, ScholarStatus } from "@/types";
 
 const STATUS_CONFIG: Record<ScholarStatus, { label: string; className: string }> = {
-  active:    { label: "Active",    className: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
-  completed: { label: "Completed", className: "bg-blue-50 text-blue-700 border border-blue-200" },
-  deferred:  { label: "Deferred",  className: "bg-amber-50 text-amber-700 border border-amber-200" },
+  active:    { label: "Active",    className: "bg-primary/10 text-primary border border-primary/20" },
+  completed: { label: "Graduated", className: "bg-muted text-muted-foreground border border-border" },
+  deferred:  { label: "On hold",  className: "bg-amber-50 text-amber-800 border border-amber-200" },
 };
 
 interface Props { scholar: Scholar }
@@ -102,7 +102,7 @@ export default function ScholarDetailClient({ scholar }: Props) {
                   <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${cfg.className}`}>
                     {cfg.label}
                   </span>
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-violet-50 text-violet-700 border border-violet-200">
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-secondary text-secondary-foreground border border-border">
                     Grade {scholar.grade}
                   </span>
                 </div>

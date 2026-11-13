@@ -48,8 +48,8 @@ import { deletePastBeneficiary } from "@/lib/actions";
 import type { PastBeneficiary, BeneficiaryStatus } from "@/types";
 
 const STATUS_CONFIG: Record<BeneficiaryStatus, { label: string; className: string }> = {
-  university: { label: "University", className: "bg-blue-50 text-blue-700 border border-blue-200" },
-  career:     { label: "Career",     className: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
+  university: { label: "University", className: "bg-muted text-muted-foreground border border-border" },
+  career:     { label: "Career",     className: "bg-muted text-muted-foreground border border-border" },
   other:      { label: "Other",      className: "bg-muted text-muted-foreground border border-border" },
 };
 
@@ -180,7 +180,7 @@ export default function BeneficiariesClient({ initialBeneficiaries }: Props) {
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0, transition: { delay: 0.1 } }}
-        className="rounded-lg border border-border bg-card overflow-hidden"
+        className="overflow-x-auto border-y border-border"
       >
         <Table>
           <TableHeader>

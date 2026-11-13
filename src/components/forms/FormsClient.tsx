@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
+  Search,
   FileText,
   Plus,
   MoreHorizontal,
@@ -23,6 +24,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -128,7 +131,7 @@ const FOLDERS: FolderDef[] = [
 
 function StatusBadge({ status }: { status: FormTemplate["status"] }) {
   const styles = {
-    active: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+    active: "bg-primary/10 text-primary border border-primary/20",
     draft: "bg-amber-50 text-amber-700 border border-amber-200",
     archived: "bg-slate-50 text-slate-600 border border-slate-200",
   };
@@ -165,6 +168,8 @@ export default function FormsClient({ initialForms, scholars, applicants }: Prop
   const [forms, setForms] = useState<FormTemplate[]>(initialForms);
   const [view, setView] = useState<FolderKey | "home">("home");
   const [submissionsTab, setSubmissionsTab] = useState<"scholars" | "applicants">("scholars");
+  const [folderSearch, setFolderSearch] = useState("");
+  const [formStatusFilter, setFormStatusFilter] = useState<FormTemplate["status"] | "all">("all");
 
   const currentFolder = FOLDERS.find((f) => f.key === view);
 
@@ -199,7 +204,7 @@ export default function FormsClient({ initialForms, scholars, applicants }: Prop
         </div>
 
         <motion.div
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+          className="divide-y border-y border-border"
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
         >
@@ -211,11 +216,11 @@ export default function FormsClient({ initialForms, scholars, applicants }: Prop
                 onClick={() => setView(folder.key)}
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0, transition: { delay: i * 0.06 } }}
-                className={`group text-left w-full rounded-xl border border-border bg-card p-5 transition-all hover:shadow-md ${folder.borderColor}`}
+                className="group flex w-full items-start gap-4 py-4 text-left transition-colors hover:bg-white/40"
               >
                 <div className="flex items-start gap-4">
-                  <div className={`w-12 h-12 rounded-xl ${folder.iconBg} flex items-center justify-center shrink-0`}>
-                    <Icon className={`w-6 h-6 ${folder.iconColor}`} />
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center">
+                    <Icon className="h-5 w-5 text-primary" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm group-hover:text-primary transition-colors">
@@ -239,7 +244,18 @@ export default function FormsClient({ initialForms, scholars, applicants }: Prop
 
   // ── FOLDER VIEW — shared chrome ──────────────────────────────────────────────
   const isSpecial = view === "submissions" || view === "report_cards";
-  const folderForms = isSpecial ? [] : forms.filter((f) => f.category === view);
+  const query = folderSearch.trim().toLowerCase();
+  const folderForms = isSpecial ? [] : forms.filter((form) =>
+    form.category === view &&
+    (formStatusFilter === "all" || form.status === formStatusFilter) &&
+    (!query || `${form.name} ${form.description}`.toLowerCase().includes(query))
+  );
+  const filteredScholars = scholars.filter((scholar) =>
+    !query || `${scholar.firstName} ${scholar.lastName} ${scholar.school}`.toLowerCase().includes(query)
+  );
+  const filteredApplicants = applicants.filter((applicant) =>
+    !query || `${applicant.firstName} ${applicant.lastName} ${applicant.institution} ${applicant.email}`.toLowerCase().includes(query)
+  );
 
   return (
     <main className="flex-1 p-6 lg:p-8 space-y-6">
@@ -253,7 +269,7 @@ export default function FormsClient({ initialForms, scholars, applicants }: Prop
           <h1 className="text-lg font-semibold">{currentFolder?.label}</h1>
         </div>
         {view !== "submissions" && (
-          <Button className="flex items-center gap-1.5" size="sm">
+          <Button variant="ghost" className="flex items-center gap-1.5 text-primary" size="sm">
             <Plus className="w-4 h-4" /> New Form
           </Button>
         )}
@@ -261,10 +277,34 @@ export default function FormsClient({ initialForms, scholars, applicants }: Prop
 
       <p className="text-sm text-muted-foreground -mt-3">{currentFolder?.description}</p>
 
+      <div className="flex flex-wrap gap-3">
+        <div className="relative min-w-[220px] flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={folderSearch}
+            onChange={(event) => setFolderSearch(event.target.value)}
+            placeholder={view === "submissions" ? "Search people and documents…" : "Search this folder…"}
+            className="pl-9"
+            aria-label="Search current folder"
+          />
+        </div>
+        {!isSpecial && (
+          <Select value={formStatusFilter} onValueChange={(value) => setFormStatusFilter(value as FormTemplate["status"] | "all")}>
+            <SelectTrigger className="w-full sm:w-40"><SelectValue placeholder="Status" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="draft">Draft</SelectItem>
+              <SelectItem value="archived">Archived</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+
       {/* ── REPORT CARDS FOLDER ─────────────────────────────────────────────── */}
       {view === "report_cards" && (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-          <div className="rounded-lg border border-border bg-card overflow-hidden">
+          <div className="overflow-x-auto border-y border-border">
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/30">
@@ -279,14 +319,14 @@ export default function FormsClient({ initialForms, scholars, applicants }: Prop
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {scholars.length === 0 ? (
+                {filteredScholars.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                       No scholars yet.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  scholars.map((s, i) => (
+                  filteredScholars.map((s, i) => (
                     <TableRow key={s.id}>
                       <TableCell className="text-muted-foreground text-xs font-mono">{i + 1}</TableCell>
                       <TableCell>
@@ -299,7 +339,7 @@ export default function FormsClient({ initialForms, scholars, applicants }: Prop
                       </TableCell>
                       <TableCell className="hidden md:table-cell text-sm text-muted-foreground truncate max-w-[160px]">{s.school}</TableCell>
                       <TableCell className="hidden sm:table-cell">
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200 font-medium">G{s.grade}</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground border border-border font-medium">G{s.grade}</span>
                       </TableCell>
                       <TableCell><DocLink url={s.term1ReportUrl} /></TableCell>
                       <TableCell><DocLink url={s.term2ReportUrl} /></TableCell>
@@ -344,7 +384,7 @@ export default function FormsClient({ initialForms, scholars, applicants }: Prop
 
           {/* Scholar Report Cards */}
           {submissionsTab === "scholars" && (
-            <div className="rounded-lg border border-border bg-card overflow-hidden">
+            <div className="overflow-x-auto border-y border-border">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/30">
@@ -359,14 +399,14 @@ export default function FormsClient({ initialForms, scholars, applicants }: Prop
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {scholars.length === 0 ? (
+                  {filteredScholars.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                         No scholars yet.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    scholars.map((s, i) => (
+                    filteredScholars.map((s, i) => (
                       <TableRow key={s.id}>
                         <TableCell className="text-muted-foreground text-xs font-mono">{i + 1}</TableCell>
                         <TableCell>
@@ -379,7 +419,7 @@ export default function FormsClient({ initialForms, scholars, applicants }: Prop
                         </TableCell>
                         <TableCell className="hidden md:table-cell text-sm text-muted-foreground truncate max-w-[160px]">{s.school}</TableCell>
                         <TableCell className="hidden sm:table-cell">
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200 font-medium">G{s.grade}</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground border border-border font-medium">G{s.grade}</span>
                         </TableCell>
                         <TableCell><DocLink url={s.term1ReportUrl} /></TableCell>
                         <TableCell><DocLink url={s.term2ReportUrl} /></TableCell>
@@ -399,7 +439,7 @@ export default function FormsClient({ initialForms, scholars, applicants }: Prop
 
           {/* Applicant Documents */}
           {submissionsTab === "applicants" && (
-            <div className="rounded-lg border border-border bg-card overflow-hidden">
+            <div className="overflow-x-auto border-y border-border">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/30">
@@ -414,14 +454,14 @@ export default function FormsClient({ initialForms, scholars, applicants }: Prop
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {applicants.length === 0 ? (
+                  {filteredApplicants.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                         No applicants yet.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    applicants.map((a, i) => {
+                    filteredApplicants.map((a, i) => {
                       const otherCount = a.otherDocs?.length ?? 0;
                       return (
                         <TableRow key={a.id}>
@@ -468,7 +508,7 @@ export default function FormsClient({ initialForms, scholars, applicants }: Prop
           animate={{ opacity: 1, y: 0 }}
         >
           {folderForms.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border py-20 text-center text-sm text-muted-foreground">
+            <div className="border-y border-border py-12 text-center text-sm text-muted-foreground">
               This folder is empty.{" "}
               <button className="text-primary underline hover:no-underline">
                 Add a form
@@ -476,18 +516,18 @@ export default function FormsClient({ initialForms, scholars, applicants }: Prop
               to get started.
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="border-y border-border">
               {folderForms.map((form, i) => (
                 <motion.div
                   key={form.id}
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0, transition: { delay: i * 0.06 } }}
                 >
-                  <Card className="hover:shadow-md transition-shadow group">
-                    <CardContent className="p-5 space-y-4">
+                  <Card className="group">
+                    <CardContent className="flex flex-col gap-3 p-0 py-4 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex items-start justify-between gap-2">
-                        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                          <FileText className="w-4 h-4 text-primary" />
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center">
+                          <FileText className="h-4 w-4 text-primary" />
                         </div>
                         <div className="flex items-center gap-2">
                           <StatusBadge status={form.status} />

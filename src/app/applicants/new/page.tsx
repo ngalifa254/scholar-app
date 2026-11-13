@@ -141,7 +141,7 @@ export default function NewApplicantPage() {
                 step === s.id
                   ? "bg-primary text-primary-foreground"
                   : step > s.id
-                  ? "bg-emerald-100 text-emerald-700"
+                  ? "bg-primary/10 text-primary"
                   : "bg-muted text-muted-foreground"
               }`}
               onClick={() => step > s.id && setStep(s.id)}
@@ -150,7 +150,7 @@ export default function NewApplicantPage() {
               <span className="hidden sm:inline">{s.label}</span>
             </button>
             {i < STEPS.length - 1 && (
-              <div className={`h-px w-6 ${step > s.id ? "bg-emerald-300" : "bg-border"}`} />
+              <div className={`h-px w-6 ${step > s.id ? "bg-primary/50" : "bg-border"}`} />
             )}
           </div>
         ))}
@@ -413,10 +413,10 @@ export default function NewApplicantPage() {
               <div>
                 <p className="text-xs text-muted-foreground mb-1.5">Hardship Indicators</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {form.hardshipChronicallyIll && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">Ill family member</span>}
-                  {form.hardshipDistanceToSchool && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">Far from school</span>}
-                  {form.hardshipHeavyChores && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">Heavy chores</span>}
-                  {form.hardshipNoCleanWater && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">No water/power</span>}
+                  {form.hardshipChronicallyIll && <span className="text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full">Ill family member</span>}
+                  {form.hardshipDistanceToSchool && <span className="text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full">Far from school</span>}
+                  {form.hardshipHeavyChores && <span className="text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full">Heavy chores</span>}
+                  {form.hardshipNoCleanWater && <span className="text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full">No water/power</span>}
                   {!form.hardshipChronicallyIll && !form.hardshipDistanceToSchool && !form.hardshipHeavyChores && !form.hardshipNoCleanWater && (
                     <span className="text-xs text-muted-foreground">None recorded</span>
                   )}
@@ -464,7 +464,7 @@ export default function NewApplicantPage() {
           <Button
             onClick={handleSubmit}
             disabled={submitting}
-            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700"
+            className="flex items-center gap-1.5"
           >
             <Check className="w-4 h-4" />
             {submitting ? "Submitting…" : "Submit Applicant"}

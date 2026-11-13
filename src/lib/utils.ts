@@ -14,13 +14,13 @@ export function getStatusConfig(status: ApplicantStatus): {
   const configs: Record<ApplicantStatus, { label: string; className: string; dot: string }> = {
     selected: {
       label: "Selected",
-      className: "bg-emerald-50 text-emerald-700 border border-emerald-200",
-      dot: "bg-emerald-500",
+      className: "bg-primary/10 text-primary border border-primary/20",
+      dot: "bg-primary",
     },
     rejected: {
       label: "Rejected",
-      className: "bg-red-50 text-red-700 border border-red-200",
-      dot: "bg-red-500",
+      className: "bg-rose-50 text-rose-800 border border-rose-200",
+      dot: "bg-rose-500",
     },
     pending: {
       label: "Pending",
@@ -29,8 +29,8 @@ export function getStatusConfig(status: ApplicantStatus): {
     },
     reviewed: {
       label: "Reviewed",
-      className: "bg-blue-50 text-blue-700 border border-blue-200",
-      dot: "bg-blue-500",
+      className: "bg-muted text-muted-foreground border border-border",
+      dot: "bg-stone-400",
     },
   };
   return configs[status] ?? {
@@ -45,15 +45,13 @@ export function getInitials(firstName: string, lastName: string): string {
 }
 
 export function getScoreColor(score: number): string {
-  if (score >= 85) return "text-emerald-600";
-  if (score >= 70) return "text-amber-600";
-  return "text-red-600";
+  void score;
+  return "text-primary";
 }
 
 export function getScoreBarColor(score: number): string {
-  if (score >= 85) return "bg-emerald-500";
-  if (score >= 70) return "bg-amber-500";
-  return "bg-red-400";
+  void score;
+  return "bg-primary";
 }
 
 export function formatDate(dateString: string): string {

@@ -8,7 +8,6 @@ import {
   BarChart3,
   Building2,
   Download,
-  User,
   Save,
   RefreshCw,
   CheckCircle2,
@@ -151,9 +150,6 @@ export default function SettingsClient({ initialSettings }: Props) {
             </TabsTrigger>
             <TabsTrigger value="export" className="flex items-center gap-1.5">
               <Download className="w-3.5 h-3.5" /> Export
-            </TabsTrigger>
-            <TabsTrigger value="account" className="flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5" /> Account
             </TabsTrigger>
           </TabsList>
 
@@ -380,40 +376,6 @@ export default function SettingsClient({ initialSettings }: Props) {
             </Card>
           </TabsContent>
 
-          {/* ── Account ── */}
-          <TabsContent value="account">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Admin Account</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Manage your administrator credentials and display name.
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-5">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label>Display Name</Label>
-                    <Input placeholder="Admin" disabled />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Email</Label>
-                    <Input type="email" placeholder="admin@wahomefoundation.org" disabled />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>New Password</Label>
-                    <Input type="password" placeholder="••••••••" disabled />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Confirm Password</Label>
-                    <Input type="password" placeholder="••••••••" disabled />
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
-                  Account management requires authentication integration — coming soon.
-                </p>
-              </CardContent>
-            </Card>
-          </TabsContent>
         </Tabs>
       </motion.div>
     </main>

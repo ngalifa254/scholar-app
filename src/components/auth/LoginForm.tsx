@@ -79,7 +79,7 @@ export default function LoginForm() {
   }
 
   return (
-    <div className="w-full max-w-sm rounded-xl border bg-card p-7 shadow-sm">
+    <div className="w-full max-w-sm border-y border-border py-7">
       <div className="mb-6">
         <h1 className="text-xl font-semibold">Staff sign in</h1>
         <p className="mt-1 text-sm text-muted-foreground">Sign in to the Wahome Foundation Student Center.</p>

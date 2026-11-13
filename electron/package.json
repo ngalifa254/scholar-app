@@ -19,7 +19,8 @@
     "asar": true,
     "files": [
       "main.cjs",
-      "package.json"
+      "package.json",
+      "assets/wahome.ico"
     ],
     "directories": {
       "output": "../release"
@@ -36,6 +37,7 @@
       ]
     },
     "win": {
+      "icon": "assets/wahome.ico",
       "target": [
         "nsis"
       ]
