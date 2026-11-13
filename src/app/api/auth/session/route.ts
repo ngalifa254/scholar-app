@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getFirebaseAdminAuth } from "@/lib/firebase-admin";
-import { isAllowedStaffEmail, STAFF_SESSION_COOKIE } from "@/lib/staff-auth";
+import { verifyFirebaseIdToken } from "@/lib/firebase-token";
+import {
+  createStaffSessionToken,
+  isAllowedStaffEmail,
+  STAFF_SESSION_COOKIE,
+  STAFF_SESSION_MAX_AGE_SECONDS,
+} from "@/lib/staff-auth";
 
 export const runtime = "nodejs";
-
-const expiresIn = 5 * 24 * 60 * 60 * 1000;
 
 function isSameOrigin(request: NextRequest) {
   return request.headers.get("origin") === new URL(request.url).origin;
@@ -21,28 +24,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ code: "MISSING_SIGN_IN_TOKEN", error: "Sign-in token is missing." }, { status: 400 });
     }
 
-    const auth = getFirebaseAdminAuth();
-
-    const decoded = await auth.verifyIdToken(body.idToken, true);
-    const authTime = Number(decoded.auth_time ?? 0);
-    if (Date.now() / 1000 - authTime > 5 * 60) {
+    const { payload, uid } = await verifyFirebaseIdToken(body.idToken);
+    const authTime = Number(payload.auth_time ?? 0);
+    if (!Number.isFinite(authTime) || Date.now() / 1000 - authTime > 5 * 60 || authTime > Date.now() / 1000 + 60) {
       return NextResponse.json({ code: "AUTHENTICATION_TOO_OLD", error: "Please sign in again." }, { status: 401 });
     }
-    if (!isAllowedStaffEmail(decoded.email)) {
+    const email = typeof payload.email === "string" ? payload.email : undefined;
+    if (!email || !isAllowedStaffEmail(email)) {
       return NextResponse.json({
         code: "STAFF_ACCESS_DENIED",
         error: "This account is not authorized for Student Center.",
       }, { status: 403 });
     }
 
-    const sessionCookie = await auth.createSessionCookie(body.idToken, { expiresIn });
+    const sessionCookie = await createStaffSessionToken({
+      uid,
+      email,
+      auth_time: authTime,
+    });
     const response = NextResponse.json({ ok: true });
     response.cookies.set(STAFF_SESSION_COOKIE, sessionCookie, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: expiresIn / 1000,
+      maxAge: STAFF_SESSION_MAX_AGE_SECONDS,
     });
     return response;
   } catch (error) {
