@@ -1,4 +1,10 @@
 const { app, BrowserWindow } = require("electron");
+const path = require("node:path");
+
+app.setPath(
+  "userData",
+  path.join(app.getPath("appData"), "WahomeFoundation", "StudentCenter")
+);
 
 const defaultUrl = "https://scholar-app-delta.vercel.app";
 const startUrl = process.env.SCHOLAR_APP_URL || defaultUrl;
