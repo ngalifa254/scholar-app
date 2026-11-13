@@ -8,6 +8,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+function formatError(cause: unknown) {
+  if (cause && typeof cause === "object") {
+    const detail = cause as { code?: unknown; name?: unknown; message?: unknown };
+    const code = typeof detail.code === "string"
+      ? detail.code
+      : typeof detail.name === "string"
+        ? detail.name
+        : "UNKNOWN_ERROR";
+    const message = typeof detail.message === "string" ? detail.message : String(cause);
+    return `${code}: ${message}`;
+  }
+
+  return `UNKNOWN_ERROR: ${String(cause)}`;
+}
+
 export default function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -34,18 +49,25 @@ export default function LoginForm() {
         body: JSON.stringify({ idToken }),
       });
       const result = await response.json().catch(() => null);
-      await signOut(auth);
 
       if (!response.ok) {
-        setError(result?.error ?? "Sign-in failed.");
+        const code = typeof result?.code === "string" ? result.code : `HTTP_${response.status}`;
+        const message = typeof result?.error === "string" ? result.error : response.statusText;
+        setError(`${code}: ${message}`);
+        try {
+          await signOut(auth);
+        } catch {
+          // Keep the session creation failure visible to the user.
+        }
         return;
       }
 
+      await signOut(auth);
       const next = searchParams.get("next");
       router.replace(next?.startsWith("/") && !next.startsWith("//") ? next : "/");
       router.refresh();
-    } catch {
-      setError("Sign-in failed. Check your credentials and try again.");
+    } catch (cause) {
+      setError(formatError(cause));
       try {
         await signOut(getFirebaseAuth());
       } catch {

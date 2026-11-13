@@ -1,7 +1,7 @@
 # Desktop builds
 
 The Electron app opens the hosted Student Center at
-`https://scholars.wahomefoundation.com`. The Next.js server and Supabase
+`https://scholar-app-delta.vercel.app`. The Next.js server and Supabase
 credentials stay on the server; the desktop package contains only the secure
 Electron window shell.
 

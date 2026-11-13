@@ -1,6 +1,6 @@
 const { app, BrowserWindow } = require("electron");
 
-const defaultUrl = "https://scholars.wahomefoundation.com";
+const defaultUrl = "https://scholar-app-delta.vercel.app";
 const startUrl = process.env.SCHOLAR_APP_URL || defaultUrl;
 const parsedStartUrl = new URL(startUrl);
 
