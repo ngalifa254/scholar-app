@@ -18,6 +18,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ApplicantAvatar } from "@/components/ui/applicant-avatar";
+import ScholarDocuments from "@/components/scholars/ScholarDocuments";
+import ScholarProgramActions from "@/components/scholars/ScholarProgramActions";
 import { formatDate } from "@/lib/utils";
 import { uploadScholarReportCard } from "@/lib/actions";
 import type { Scholar, ScholarStatus } from "@/types";
@@ -26,6 +28,8 @@ const STATUS_CONFIG: Record<ScholarStatus, { label: string; className: string }>
   active:    { label: "Active",    className: "bg-primary/10 text-primary border border-primary/20" },
   completed: { label: "Graduated", className: "bg-muted text-muted-foreground border border-border" },
   deferred:  { label: "On hold",  className: "bg-amber-50 text-amber-800 border border-amber-200" },
+  archived:  { label: "Archived", className: "bg-muted text-muted-foreground border border-border" },
+  withdrawn: { label: "Removed from program", className: "bg-rose-50 text-rose-800 border border-rose-200" },
 };
 
 interface Props { scholar: Scholar }
@@ -72,17 +76,20 @@ export default function ScholarDetailClient({ scholar }: Props) {
 
   return (
     <main className="flex-1 p-6 lg:p-8 space-y-6 max-w-3xl">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <Button variant="ghost" size="sm" asChild>
           <Link href="/scholars" className="flex items-center gap-1.5 text-muted-foreground">
             <ArrowLeft className="w-4 h-4" /> Scholars
           </Link>
         </Button>
-        <Button asChild>
-          <Link href={`/scholars/${scholar.id}/edit`} className="flex items-center gap-1.5">
-            <Pencil className="w-4 h-4" /> Edit
-          </Link>
-        </Button>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <ScholarProgramActions scholar={scholar} compact />
+          <Button asChild>
+            <Link href={`/scholars/${scholar.id}/edit`} className="flex items-center gap-1.5">
+              <Pencil className="w-4 h-4" /> Edit
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Hero */}
@@ -94,7 +101,7 @@ export default function ScholarDetailClient({ scholar }: Props) {
                 firstName={scholar.firstName}
                 lastName={scholar.lastName}
                 photoUrl={scholar.profilePhotoUrl}
-                size={72}
+                size={112}
               />
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-3 mb-1">
@@ -178,6 +185,8 @@ export default function ScholarDetailClient({ scholar }: Props) {
           </CardContent>
         </Card>
       </motion.div>
+
+      <ScholarDocuments scholar={scholar} />
 
       {/* Report Cards */}
       <motion.div

@@ -12,6 +12,8 @@ import {
   Eye,
   Pencil,
   Trash2,
+  AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,7 +46,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
-import { deleteApplicant } from "@/lib/actions";
+import { clearApplicants, deleteApplicant } from "@/lib/actions";
 import {
   getStatusConfig,
   getScoreColor,
@@ -73,6 +75,10 @@ export default function ApplicantsClient({ initialApplicants }: Props) {
   const [detailTarget, setDetailTarget] = useState<Applicant | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [clearAllOpen, setClearAllOpen] = useState(false);
+  const [clearingAll, setClearingAll] = useState(false);
+  const [clearAllError, setClearAllError] = useState<string | null>(null);
+  const [clearNotice, setClearNotice] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     let list = [...applicants];
@@ -134,6 +140,25 @@ export default function ApplicantsClient({ initialApplicants }: Props) {
     setDeleteTarget(null);
   }
 
+  async function handleClearAll() {
+    setClearingAll(true);
+    setClearAllError(null);
+    const result = await clearApplicants();
+    setClearingAll(false);
+    if (result.error) {
+      setClearAllError(result.error);
+      return;
+    }
+    setApplicants([]);
+    setDetailTarget(null);
+    setClearAllOpen(false);
+    setClearNotice(
+      result.fileDeleteFailures
+        ? `Cleared ${result.deletedCount ?? 0} applicants. ${result.fileDeleteFailures} uploaded file${result.fileDeleteFailures === 1 ? "" : "s"} could not be removed.`
+        : `Cleared ${result.deletedCount ?? 0} applicants.`
+    );
+  }
+
   return (
     <main className="flex-1 p-6 lg:p-8 space-y-6">
       {/* Header */}
@@ -144,13 +169,21 @@ export default function ApplicantsClient({ initialApplicants }: Props) {
             {filtered.length} of {applicants.length} applicants
           </p>
         </div>
-        <Button asChild>
-          <Link href="/applicants/new" className="flex items-center gap-1.5">
-            <UserPlus className="w-4 h-4" />
-            New Applicant
-          </Link>
-        </Button>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {applicants.length > 0 && (
+            <Button type="button" variant="outline" className="gap-1.5 text-destructive hover:text-destructive" onClick={() => { setClearAllError(null); setClearAllOpen(true); }}>
+              <Trash2 className="h-4 w-4" /> Clear Applicants
+            </Button>
+          )}
+          <Button asChild>
+            <Link href="/applicants/new" className="flex items-center gap-1.5">
+              <UserPlus className="w-4 h-4" />
+              New Applicant
+            </Link>
+          </Button>
+        </div>
       </div>
+      {clearNotice && <p role="status" className="text-sm text-muted-foreground">{clearNotice}</p>}
 
       {/* Filters */}
       <motion.div
@@ -388,6 +421,27 @@ export default function ApplicantsClient({ initialApplicants }: Props) {
           )}
         </SheetContent>
       </Sheet>
+
+      <Dialog open={clearAllOpen} onOpenChange={(open) => { if (!clearingAll) { setClearAllOpen(open); if (!open) setClearAllError(null); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" /> Clear all applicants?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This permanently removes all {applicants.length} applicant records and their uploaded files. Files also used by existing scholar profiles will be kept. Make sure the selection cycle is complete before continuing.
+          </p>
+          {clearAllError && <p className="text-sm text-destructive">{clearAllError}</p>}
+          <div className="mt-2 flex justify-end gap-2">
+            <Button type="button" variant="outline" disabled={clearingAll} onClick={() => setClearAllOpen(false)}>Cancel</Button>
+            <Button type="button" variant="destructive" disabled={clearingAll || applicants.length === 0} onClick={handleClearAll} className="gap-1.5">
+              {clearingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              {clearingAll ? "Clearing…" : "Clear all applicants"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) { setDeleteTarget(null); setDeleteError(null); } }}>

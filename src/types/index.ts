@@ -45,6 +45,17 @@ export interface Applicant {
 }
 
 export type FormCategory = 'scholarship_docs' | 'tools' | 'resources' | 'archives' | 'other';
+export type FormDocumentFolder = FormCategory | 'submissions' | 'report_cards';
+
+export interface ManagedFormFile {
+  id: string;
+  folder: FormDocumentFolder;
+  name: string;
+  fileName: string;
+  fileUrl: string;
+  storagePath: string;
+  createdAt: string;
+}
 
 export interface FormTemplate {
   id: string;
@@ -63,7 +74,13 @@ export interface SortConfig {
   direction: 'asc' | 'desc';
 }
 
-export type ScholarStatus = 'active' | 'completed' | 'deferred';
+export type ScholarStatus = 'active' | 'completed' | 'deferred' | 'archived' | 'withdrawn';
+
+export interface ScholarActivityEntry {
+  subject: string;
+  note: string;
+  createdAt: string;
+}
 
 export interface Scholar {
   id: string;
@@ -79,6 +96,12 @@ export interface Scholar {
   notes: string;
   status: ScholarStatus;
   createdAt: string;
+  sourceApplicantId?: string;
+  activityLog?: ScholarActivityEntry[];
+  guardianIdUrl?: string;
+  grade8ReportUrl?: string;
+  recommendationUrl?: string;
+  otherDocs?: Array<{ name: string; url: string }>;
   term1ReportUrl?: string;
   term2ReportUrl?: string;
   term3ReportUrl?: string;
@@ -115,4 +138,17 @@ export interface PastBeneficiary {
   location: string;
   notes: string;
   createdAt: string;
+  sourceScholarId?: string;
+  gradeAtGraduation?: number;
+  yearJoined?: number;
+  guardianName?: string;
+  guardianContact?: string;
+  guardianIdUrl?: string;
+  grade8ReportUrl?: string;
+  recommendationUrl?: string;
+  otherDocs?: Array<{ name: string; url: string }>;
+  term1ReportUrl?: string;
+  term2ReportUrl?: string;
+  term3ReportUrl?: string;
+  activityLog?: ScholarActivityEntry[];
 }

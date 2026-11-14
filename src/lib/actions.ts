@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { getStaffFirestore } from "./staff-firestore";
 import { privateFileUrl, uploadStaffFile, deleteStaffFile } from "./staff-storage";
 import { computeScore } from "./scoring";
-import type { ApplicantStatus, AppSettings, ChildStatus, AcademicMerit, CharacterLeadership, ScholarStatus, BeneficiaryStatus } from "@/types";
+import type { ApplicantStatus, AppSettings, ChildStatus, AcademicMerit, CharacterLeadership, ScholarStatus, BeneficiaryStatus, FormDocumentFolder } from "@/types";
 
 async function uploadProfilePhoto(file: File): Promise<string | null> {
   const path = await uploadStaffFile(file, "photos");
@@ -118,6 +118,93 @@ export async function deleteApplicant(
   return {};
 }
 
+export async function clearApplicants(): Promise<{ deletedCount?: number; fileDeleteFailures?: number; error?: string }> {
+  const db = await getStaffFirestore();
+  const [applicantsSnapshot, scholarsSnapshot] = await Promise.all([
+    db.collection("applicants").get(),
+    db.collection("scholars").get(),
+  ]);
+
+  const protectedPaths = new Set<string>();
+  for (const scholarDocument of scholarsSnapshot.docs) {
+    const scholar = scholarDocument.data();
+    for (const field of [
+      "profile_photo_url",
+      "guardian_id_url",
+      "grade8_report_url",
+      "recommendation_url",
+      "term1_report_url",
+      "term2_report_url",
+      "term3_report_url",
+    ]) {
+      const url = scholar[field];
+      if (typeof url === "string") {
+        const path = filePathFromPrivateUrl(url);
+        if (path) protectedPaths.add(path);
+      }
+    }
+    if (Array.isArray(scholar.other_docs)) {
+      for (const document of scholar.other_docs as Array<{ url?: unknown }>) {
+        if (typeof document?.url === "string") {
+          const path = filePathFromPrivateUrl(document.url);
+          if (path) protectedPaths.add(path);
+        }
+      }
+    }
+  }
+
+  const filePaths = new Set<string>();
+  for (const applicantDocument of applicantsSnapshot.docs) {
+    const applicant = applicantDocument.data();
+    for (const field of [
+      "profile_photo_url",
+      "guardian_id_url",
+      "grade8_report_url",
+      "recommendation_url",
+    ]) {
+      const url = applicant[field];
+      if (typeof url === "string") {
+        const path = filePathFromPrivateUrl(url);
+        if (path) filePaths.add(path);
+      }
+    }
+    if (Array.isArray(applicant.other_docs)) {
+      for (const document of applicant.other_docs as Array<{ url?: unknown }>) {
+        if (typeof document?.url === "string") {
+          const path = filePathFromPrivateUrl(document.url);
+          if (path) filePaths.add(path);
+        }
+      }
+    }
+  }
+
+  let fileDeleteFailures = 0;
+  for (const path of filePaths) {
+    if (protectedPaths.has(path)) continue;
+    try {
+      await deleteStaffFile(path);
+    } catch {
+      fileDeleteFailures += 1;
+    }
+  }
+
+  try {
+    for (const applicantDocument of applicantsSnapshot.docs) {
+      await db.collection("applicants").doc(applicantDocument.id).delete();
+    }
+  } catch (error) {
+    revalidatePath("/applicants");
+    revalidatePath("/forms");
+    revalidatePath("/");
+    return { error: error instanceof Error ? error.message : "Could not clear all applicant records." };
+  }
+
+  revalidatePath("/applicants");
+  revalidatePath("/forms");
+  revalidatePath("/");
+  return { deletedCount: applicantsSnapshot.docs.length, fileDeleteFailures };
+}
+
 export async function updateApplicantStatus(
   id: string,
   status: ApplicantStatus
@@ -213,6 +300,51 @@ export async function removeApplicantOtherDoc(
 
 // ─── Scholars ────────────────────────────────────────────────────────────────
 
+export async function addSelectedApplicantToScholars(
+  applicantId: string
+): Promise<{ scholarId?: string; error?: string }> {
+  const db = await getStaffFirestore();
+  const applicantRef = db.collection("applicants").doc(applicantId);
+  const scholarRef = db.collection("scholars").doc(`applicant-${applicantId}`);
+  const applicantSnapshot = await applicantRef.get();
+  if (!applicantSnapshot.exists) return { error: "Applicant not found." };
+  const applicant = applicantSnapshot.data();
+  if (applicant.status !== "selected") {
+    return { error: "Only selected applicants can be added as scholars." };
+  }
+
+  const scholarSnapshot = await scholarRef.get();
+  if (!scholarSnapshot.exists) {
+    await scholarRef.set({
+      first_name: applicant.first_name ?? "",
+      last_name: applicant.last_name ?? "",
+      profile_photo_url: applicant.profile_photo_url ?? null,
+      school: applicant.institution ?? "",
+      grade: Number(applicant.year_of_study) || 9,
+      location: applicant.location ?? "",
+      guardian_name: applicant.guardian_name ?? "",
+      guardian_contact: applicant.guardian_contact ?? "",
+      year_joined: new Date().getFullYear(),
+      notes: applicant.notes ?? "",
+      status: "active",
+      source_applicant_id: applicantId,
+      guardian_id_url: applicant.guardian_id_url ?? null,
+      grade8_report_url: applicant.grade8_report_url ?? null,
+      recommendation_url: applicant.recommendation_url ?? null,
+      other_docs: Array.isArray(applicant.other_docs) ? applicant.other_docs : [],
+      created_at: new Date().toISOString(),
+    });
+  }
+  const result = { scholarId: scholarRef.id };
+
+  if (result.scholarId) {
+    revalidatePath("/scholars");
+    revalidatePath(`/scholars/${result.scholarId}`);
+    revalidatePath(`/applicants/${applicantId}`);
+  }
+  return result;
+}
+
 function parseScholarFormData(fd: FormData) {
   return {
     first_name: String(fd.get("firstName") ?? ""),
@@ -269,6 +401,69 @@ export async function deleteScholar(id: string): Promise<{ error?: string }> {
   return {};
 }
 
+export async function updateScholarProgramStatus(
+  id: string,
+  status: ScholarStatus
+): Promise<{ error?: string; beneficiaryId?: string }> {
+  const allowedStatuses: ScholarStatus[] = ["active", "completed", "deferred", "archived", "withdrawn"];
+  if (!allowedStatuses.includes(status)) return { error: "Invalid scholar status." };
+
+  const db = await getStaffFirestore();
+  const ref = db.collection("scholars").doc(id);
+  const snapshot = await ref.get();
+  if (!snapshot.exists) return { error: "Scholar not found." };
+
+  if (status === "archived") {
+    const scholar = snapshot.data();
+    const beneficiaryRef = db.collection("past_beneficiaries").doc(`scholar-${id}`);
+    const existingBeneficiary = await beneficiaryRef.get();
+    if (!existingBeneficiary.exists) {
+      const archivedAt = new Date().toISOString();
+      await beneficiaryRef.set({
+        first_name: scholar.first_name ?? "",
+        last_name: scholar.last_name ?? "",
+        profile_photo_url: scholar.profile_photo_url ?? null,
+        high_school: scholar.school ?? "",
+        year_graduated: new Date().getFullYear(),
+        current_status: "other",
+        institution: "",
+        field_of_study: "",
+        location: scholar.location ?? "",
+        notes: scholar.notes ?? "",
+        created_at: archivedAt,
+        source_scholar_id: id,
+        grade_at_graduation: Number(scholar.grade) || null,
+        year_joined: Number(scholar.year_joined) || null,
+        guardian_name: scholar.guardian_name ?? "",
+        guardian_contact: scholar.guardian_contact ?? "",
+        guardian_id_url: scholar.guardian_id_url ?? null,
+        grade8_report_url: scholar.grade8_report_url ?? null,
+        recommendation_url: scholar.recommendation_url ?? null,
+        other_docs: Array.isArray(scholar.other_docs) ? scholar.other_docs : [],
+        term1_report_url: scholar.term1_report_url ?? null,
+        term2_report_url: scholar.term2_report_url ?? null,
+        term3_report_url: scholar.term3_report_url ?? null,
+        activity_log: Array.isArray(scholar.activity_log) ? scholar.activity_log : [],
+      });
+    }
+    await ref.delete();
+    revalidatePath("/scholars");
+    revalidatePath(`/scholars/${id}`);
+    revalidatePath("/past-beneficiaries");
+    revalidatePath(`/past-beneficiaries/${beneficiaryRef.id}`);
+    revalidatePath("/");
+    revalidatePath("/forms");
+    return { beneficiaryId: beneficiaryRef.id };
+  }
+
+  await ref.update({ status });
+  revalidatePath("/scholars");
+  revalidatePath(`/scholars/${id}`);
+  revalidatePath("/");
+  revalidatePath("/forms");
+  return {};
+}
+
 export async function uploadScholarReportCard(
   scholarId: string,
   term: 1 | 2 | 3,
@@ -286,6 +481,100 @@ export async function uploadScholarReportCard(
   revalidatePath(`/scholars/${scholarId}`);
   revalidatePath("/forms");
   return { url };
+}
+
+type ScholarApplicationDocType = "guardian_id" | "grade8_report" | "recommendation";
+
+const SCHOLAR_APPLICATION_DOC_COLUMNS: Record<ScholarApplicationDocType, string> = {
+  guardian_id: "guardian_id_url",
+  grade8_report: "grade8_report_url",
+  recommendation: "recommendation_url",
+};
+
+export async function uploadScholarApplicationDocument(
+  scholarId: string,
+  docType: ScholarApplicationDocType,
+  formData: FormData
+): Promise<{ url?: string; error?: string }> {
+  const file = formData.get("file") as File | null;
+  if (!file || file.size === 0) return { error: "No file provided." };
+  if (!Object.hasOwn(SCHOLAR_APPLICATION_DOC_COLUMNS, docType)) return { error: "Invalid document type." };
+
+  const db = await getStaffFirestore();
+  const scholarRef = db.collection("scholars").doc(scholarId);
+  const scholarSnapshot = await scholarRef.get();
+  if (!scholarSnapshot.exists) return { error: "Scholar not found." };
+
+  const path = await uploadStaffFile(file, "docs");
+  const url = privateFileUrl(path);
+  await scholarRef.update({ [SCHOLAR_APPLICATION_DOC_COLUMNS[docType]]: url });
+  revalidatePath(`/scholars/${scholarId}`);
+  revalidatePath("/forms");
+  return { url };
+}
+
+export async function addScholarOtherDocument(
+  scholarId: string,
+  formData: FormData
+): Promise<{ doc?: { name: string; url: string }; error?: string }> {
+  const file = formData.get("file") as File | null;
+  const name = String(formData.get("name") ?? "").trim();
+  if (!file || file.size === 0) return { error: "No file provided." };
+  if (!name) return { error: "Document name is required." };
+
+  const db = await getStaffFirestore();
+  const scholarRef = db.collection("scholars").doc(scholarId);
+  const snapshot = await scholarRef.get();
+  if (!snapshot.exists) return { error: "Scholar not found." };
+
+  const path = await uploadStaffFile(file, "docs");
+  const doc = { name, url: privateFileUrl(path) };
+  const existing = (snapshot.get("other_docs") as Array<{ name: string; url: string }> | null) ?? [];
+  await scholarRef.update({ other_docs: [...existing, doc] });
+  revalidatePath(`/scholars/${scholarId}`);
+  revalidatePath("/forms");
+  return { doc };
+}
+
+export async function removeScholarOtherDocument(
+  scholarId: string,
+  url: string
+): Promise<{ error?: string }> {
+  const db = await getStaffFirestore();
+  const scholarRef = db.collection("scholars").doc(scholarId);
+  const snapshot = await scholarRef.get();
+  if (!snapshot.exists) return { error: "Scholar not found." };
+
+  const existing = (snapshot.get("other_docs") as Array<{ name: string; url: string }> | null) ?? [];
+  await scholarRef.update({ other_docs: existing.filter((document) => document.url !== url) });
+  revalidatePath(`/scholars/${scholarId}`);
+  revalidatePath("/forms");
+  return {};
+}
+
+export async function addScholarActivityNote(
+  scholarId: string,
+  subject: string,
+  note: string
+): Promise<{ entry?: { subject: string; note: string; createdAt: string }; error?: string }> {
+  const trimmedSubject = subject.trim();
+  const trimmedNote = note.trim();
+  if (!trimmedSubject) return { error: "Enter a subject first." };
+  if (trimmedSubject.length > 100) return { error: "Subjects must be 100 characters or fewer." };
+  if (!trimmedNote) return { error: "Enter a note first." };
+  if (trimmedNote.length > 500) return { error: "Notes must be 500 characters or fewer." };
+
+  const db = await getStaffFirestore();
+  const ref = db.collection("scholars").doc(scholarId);
+  const snapshot = await ref.get();
+  if (!snapshot.exists) return { error: "Scholar not found." };
+
+  const createdAt = new Date().toISOString();
+  const entry = { subject: trimmedSubject, note: trimmedNote, createdAt };
+  const activityLog = (snapshot.get("activity_log") as Array<{ subject?: string; note: string; createdAt: string }> | null) ?? [];
+  await ref.update({ activity_log: [...activityLog, entry] });
+  revalidatePath(`/scholars/${scholarId}`);
+  return { entry };
 }
 
 // ─── Past Beneficiaries ───────────────────────────────────────────────────────
@@ -353,6 +642,72 @@ export async function deleteFormTemplate(
   const db = await getStaffFirestore();
   await db.collection("form_templates").doc(id).delete();
 
+  revalidatePath("/forms");
+  return {};
+}
+
+const FORM_DOCUMENT_FOLDERS: FormDocumentFolder[] = [
+  "scholarship_docs",
+  "submissions",
+  "report_cards",
+  "tools",
+  "resources",
+  "archives",
+  "other",
+];
+
+export async function uploadManagedFormFile(
+  folder: FormDocumentFolder,
+  name: string,
+  formData: FormData
+): Promise<{ file?: { id: string; folder: FormDocumentFolder; name: string; fileName: string; fileUrl: string; storagePath: string; createdAt: string }; error?: string }> {
+  const file = formData.get("file") as File | null;
+  const displayName = name.trim();
+  if (!FORM_DOCUMENT_FOLDERS.includes(folder)) return { error: "Invalid folder." };
+  if (!file || file.size === 0) return { error: "Choose a file to upload." };
+  if (!displayName) return { error: "A file name is required." };
+
+  const storagePath = await uploadStaffFile(file, "docs");
+  const fileUrl = privateFileUrl(storagePath);
+  const createdAt = new Date().toISOString();
+  const db = await getStaffFirestore();
+  const ref = db.collection("form_documents").doc();
+  await ref.set({
+    folder,
+    name: displayName,
+    file_name: file.name,
+    file_url: fileUrl,
+    storage_path: storagePath,
+    created_at: createdAt,
+    updated_at: createdAt,
+  });
+  revalidatePath("/forms");
+  return { file: { id: ref.id, folder, name: displayName, fileName: file.name, fileUrl, storagePath, createdAt } };
+}
+
+export async function renameManagedFormFile(
+  id: string,
+  name: string
+): Promise<{ name?: string; error?: string }> {
+  const displayName = name.trim();
+  if (!displayName) return { error: "A file name is required." };
+  const db = await getStaffFirestore();
+  const ref = db.collection("form_documents").doc(id);
+  const snapshot = await ref.get();
+  if (!snapshot.exists) return { error: "File not found." };
+  await ref.update({ name: displayName, updated_at: new Date().toISOString() });
+  revalidatePath("/forms");
+  return { name: displayName };
+}
+
+export async function deleteManagedFormFile(id: string): Promise<{ error?: string }> {
+  const db = await getStaffFirestore();
+  const ref = db.collection("form_documents").doc(id);
+  const snapshot = await ref.get();
+  if (!snapshot.exists) return { error: "File not found." };
+  const storagePath = String(snapshot.get("storage_path") ?? "");
+  if (storagePath) await deleteStaffFile(storagePath);
+  await ref.delete();
   revalidatePath("/forms");
   return {};
 }

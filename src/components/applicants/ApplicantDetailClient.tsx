@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -35,7 +36,7 @@ import {
   CHARACTER_SCORES,
 } from "@/lib/scoring";
 import DocumentsTab from "@/components/applicants/DocumentsTab";
-import { updateApplicantStatus } from "@/lib/actions";
+import { addSelectedApplicantToScholars, updateApplicantStatus } from "@/lib/actions";
 import type { Applicant, ApplicantStatus } from "@/types";
 
 interface Props {
@@ -64,14 +65,29 @@ const STATUS_ACTIONS: Record<
 };
 
 export default function ApplicantDetailClient({ applicant: app }: Props) {
+  const router = useRouter();
   const [currentStatus, setCurrentStatus] = useState<ApplicantStatus>(app.status);
   const [updating, setUpdating] = useState(false);
+  const [addingToScholars, setAddingToScholars] = useState(false);
+  const [conversionError, setConversionError] = useState<string | null>(null);
 
   async function handleStatusChange(newStatus: ApplicantStatus) {
     setUpdating(true);
     const result = await updateApplicantStatus(app.id, newStatus);
     if (!result.error) setCurrentStatus(newStatus);
     setUpdating(false);
+  }
+
+  async function handleAddToScholars() {
+    setAddingToScholars(true);
+    setConversionError(null);
+    const result = await addSelectedApplicantToScholars(app.id);
+    setAddingToScholars(false);
+    if (result.error) {
+      setConversionError(result.error);
+      return;
+    }
+    if (result.scholarId) router.push(`/scholars/${result.scholarId}`);
   }
 
   const hardshipCount = [
@@ -161,8 +177,15 @@ export default function ApplicantDetailClient({ applicant: app }: Props) {
                       {action.label}
                     </Button>
                   ))}
+                  {currentStatus === "selected" && (
+                    <Button size="sm" disabled={addingToScholars || updating} onClick={handleAddToScholars} className="h-7 gap-1.5 px-3 text-xs">
+                      {addingToScholars ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <GraduationCap className="h-3.5 w-3.5" />}
+                      {addingToScholars ? "Adding…" : "Add to Scholars"}
+                    </Button>
+                  )}
                   {updating && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
                 </div>
+                {conversionError && <p className="mb-2 text-xs text-destructive">{conversionError}</p>}
                 <p className="text-sm text-muted-foreground">
                   {app.institution} · Grade {app.yearOfStudy}
                   {app.location ? ` · ${app.location}` : ""}

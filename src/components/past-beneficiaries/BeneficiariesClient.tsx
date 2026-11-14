@@ -263,7 +263,7 @@ export default function BeneficiariesClient({ initialBeneficiaries }: Props) {
                       <span
                         className={`px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap ${cfg.className}`}
                       >
-                        {cfg.label}
+                        {b.sourceScholarId ? "Scholar Alumni" : cfg.label}
                       </span>
                     </TableCell>
                     <TableCell>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowLeft, Pencil, MapPin, GraduationCap, Building2, Briefcase, Calendar } from "lucide-react";
+import { ArrowLeft, Pencil, MapPin, GraduationCap, Building2, Briefcase, Calendar, ExternalLink, FileText, Clock3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ApplicantAvatar } from "@/components/ui/applicant-avatar";
@@ -122,6 +122,52 @@ export default function BeneficiaryDetailClient({ beneficiary: b }: Props) {
           </CardContent>
         </Card>
       </motion.div>
+
+      {b.sourceScholarId && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <FileText className="h-4 w-4" /> Archived Scholar Records
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {b.gradeAtGraduation && <p className="text-xs text-muted-foreground">Last recorded grade: {b.gradeAtGraduation}{b.yearJoined ? ` · Joined ${b.yearJoined}` : ""}</p>}
+            <div className="grid gap-2 sm:grid-cols-2">
+              {[
+                ["Parent / Guardian ID", b.guardianIdUrl],
+                ["Grade 8 Report Card", b.grade8ReportUrl],
+                ["Recommendation Letter", b.recommendationUrl],
+                ["Term 1 Report Card", b.term1ReportUrl],
+                ["Term 2 Report Card", b.term2ReportUrl],
+                ["Term 3 Report Card", b.term3ReportUrl],
+              ].filter((item): item is [string, string] => !!item[1]).map(([label, url]) => (
+                <a key={label} href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 rounded-sm border border-border px-3 py-2 text-sm hover:border-primary/40 hover:text-primary">
+                  <FileText className="h-4 w-4 shrink-0" /> <span className="min-w-0 flex-1 truncate">{label}</span> <ExternalLink className="h-3 w-3 shrink-0" />
+                </a>
+              ))}
+              {(b.otherDocs ?? []).map((document) => (
+                <a key={document.url} href={document.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 rounded-sm border border-border px-3 py-2 text-sm hover:border-primary/40 hover:text-primary">
+                  <FileText className="h-4 w-4 shrink-0" /> <span className="min-w-0 flex-1 truncate">{document.name}</span> <ExternalLink className="h-3 w-3 shrink-0" />
+                </a>
+              ))}
+            </div>
+            {(b.activityLog?.length ?? 0) > 0 && (
+              <div className="border-t border-border pt-3">
+                <h3 className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground"><Clock3 className="h-3.5 w-3.5" /> Activity history</h3>
+                <ul className="divide-y divide-border">
+                  {[...(b.activityLog ?? [])].reverse().map((entry, index) => (
+                    <li key={`${entry.createdAt}-${index}`} className="py-2">
+                      <p className="text-sm font-medium">{entry.subject || "Activity note"}</p>
+                      <p className="mt-0.5 whitespace-pre-wrap text-sm text-muted-foreground">{entry.note}</p>
+                      <time dateTime={entry.createdAt} className="mt-1 block text-xs text-muted-foreground">{new Date(entry.createdAt).toLocaleString()}</time>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {b.notes && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0, transition: { delay: 0.2 } }}>

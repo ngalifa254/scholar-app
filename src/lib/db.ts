@@ -3,6 +3,9 @@ import type {
   Applicant,
   AppSettings,
   FormTemplate,
+  ManagedFormFile,
+  FormDocumentFolder,
+  ScholarActivityEntry,
   ApplicantStatus,
   ChildStatus,
   AcademicMerit,
@@ -224,6 +227,12 @@ type ScholarRow = {
   notes: string;
   status: ScholarStatus;
   created_at: string;
+  source_applicant_id?: string | null;
+  activity_log?: ScholarActivityEntry[] | null;
+  guardian_id_url?: string | null;
+  grade8_report_url?: string | null;
+  recommendation_url?: string | null;
+  other_docs?: Array<{ name: string; url: string }> | null;
   term1_report_url?: string | null;
   term2_report_url?: string | null;
   term3_report_url?: string | null;
@@ -244,6 +253,12 @@ function rowToScholar(row: ScholarRow): Scholar {
     notes: row.notes ?? "",
     status: row.status ?? "active",
     createdAt: row.created_at,
+    sourceApplicantId: row.source_applicant_id ?? undefined,
+    activityLog: row.activity_log ?? [],
+    guardianIdUrl: row.guardian_id_url ?? undefined,
+    grade8ReportUrl: row.grade8_report_url ?? undefined,
+    recommendationUrl: row.recommendation_url ?? undefined,
+    otherDocs: row.other_docs ?? [],
     term1ReportUrl: row.term1_report_url ?? undefined,
     term2ReportUrl: row.term2_report_url ?? undefined,
     term3ReportUrl: row.term3_report_url ?? undefined,
@@ -289,6 +304,19 @@ type PastBeneficiaryRow = {
   location: string;
   notes: string;
   created_at: string;
+  source_scholar_id?: string | null;
+  grade_at_graduation?: number | null;
+  year_joined?: number | null;
+  guardian_name?: string | null;
+  guardian_contact?: string | null;
+  guardian_id_url?: string | null;
+  grade8_report_url?: string | null;
+  recommendation_url?: string | null;
+  other_docs?: Array<{ name: string; url: string }> | null;
+  term1_report_url?: string | null;
+  term2_report_url?: string | null;
+  term3_report_url?: string | null;
+  activity_log?: ScholarActivityEntry[] | null;
 };
 
 function rowToBeneficiary(row: PastBeneficiaryRow): PastBeneficiary {
@@ -305,6 +333,19 @@ function rowToBeneficiary(row: PastBeneficiaryRow): PastBeneficiary {
     location: row.location ?? "",
     notes: row.notes ?? "",
     createdAt: row.created_at,
+    sourceScholarId: row.source_scholar_id ?? undefined,
+    gradeAtGraduation: row.grade_at_graduation ?? undefined,
+    yearJoined: row.year_joined ?? undefined,
+    guardianName: row.guardian_name ?? undefined,
+    guardianContact: row.guardian_contact ?? undefined,
+    guardianIdUrl: row.guardian_id_url ?? undefined,
+    grade8ReportUrl: row.grade8_report_url ?? undefined,
+    recommendationUrl: row.recommendation_url ?? undefined,
+    otherDocs: row.other_docs ?? [],
+    term1ReportUrl: row.term1_report_url ?? undefined,
+    term2ReportUrl: row.term2_report_url ?? undefined,
+    term3ReportUrl: row.term3_report_url ?? undefined,
+    activityLog: row.activity_log ?? [],
   };
 }
 
@@ -351,4 +392,23 @@ export async function getFormTemplates(): Promise<FormTemplate[]> {
     createdAt: row.created_at,
     lastModified: row.last_modified,
   }));
+}
+
+export async function getManagedFormFiles(): Promise<ManagedFormFile[]> {
+  const db = await getStaffFirestore();
+  const snapshot = await db.collection("form_documents").get();
+  return snapshot.docs
+    .map((document) => {
+      const row = document.data();
+      return {
+        id: document.id,
+        folder: row.folder as FormDocumentFolder,
+        name: String(row.name ?? ""),
+        fileName: String(row.file_name ?? ""),
+        fileUrl: String(row.file_url ?? ""),
+        storagePath: String(row.storage_path ?? ""),
+        createdAt: String(row.created_at ?? ""),
+      };
+    })
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }

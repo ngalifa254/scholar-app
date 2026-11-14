@@ -42,9 +42,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ApplicantAvatar } from "@/components/ui/applicant-avatar";
+import ManagedFiles from "@/components/forms/ManagedFiles";
 import { deleteFormTemplate } from "@/lib/actions";
 import { formatDate } from "@/lib/utils";
-import type { FormTemplate, FormCategory, Scholar, Applicant } from "@/types";
+import type { FormTemplate, FormCategory, FormDocumentFolder, ManagedFormFile, Scholar, Applicant } from "@/types";
 
 // ── Folder definitions ────────────────────────────────────────────────────────
 
@@ -162,9 +163,10 @@ interface Props {
   initialForms: FormTemplate[];
   scholars: Scholar[];
   applicants: Applicant[];
+  initialFiles: ManagedFormFile[];
 }
 
-export default function FormsClient({ initialForms, scholars, applicants }: Props) {
+export default function FormsClient({ initialForms, scholars, applicants, initialFiles }: Props) {
   const [forms, setForms] = useState<FormTemplate[]>(initialForms);
   const [view, setView] = useState<FolderKey | "home">("home");
   const [submissionsTab, setSubmissionsTab] = useState<"scholars" | "applicants">("scholars");
@@ -578,6 +580,13 @@ export default function FormsClient({ initialForms, scholars, applicants }: Prop
           )}
         </motion.div>
       )}
+
+      <ManagedFiles
+        key={view}
+        folder={view as FormDocumentFolder}
+        initialFiles={initialFiles.filter((file) => file.folder === view)}
+        search={folderSearch}
+      />
     </main>
   );
 }

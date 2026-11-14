@@ -12,6 +12,9 @@ import {
   Eye,
   Pencil,
   Trash2,
+  Archive,
+  UserRoundX,
+  RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,12 +49,15 @@ import {
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { ApplicantAvatar } from "@/components/ui/applicant-avatar";
 import { deleteScholar } from "@/lib/actions";
+import { updateScholarProgramStatus } from "@/lib/actions";
 import type { Scholar, ScholarStatus } from "@/types";
 
 const STATUS_CONFIG: Record<ScholarStatus, { label: string; className: string }> = {
   active:    { label: "Active",    className: "bg-primary/10 text-primary border border-primary/20" },
   completed: { label: "Graduated", className: "bg-muted text-muted-foreground border border-border" },
   deferred:  { label: "On hold",   className: "bg-amber-50 text-amber-800 border border-amber-200" },
+  archived:  { label: "Archived",  className: "bg-muted text-muted-foreground border border-border" },
+  withdrawn: { label: "Removed",   className: "bg-rose-50 text-rose-800 border border-rose-200" },
 };
 
 type SortKey = "firstName" | "school" | "yearJoined" | "status";
@@ -73,6 +79,9 @@ export default function ScholarsClient({ initialScholars }: Props) {
   const [detailTarget, setDetailTarget] = useState<Scholar | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [statusTarget, setStatusTarget] = useState<{ scholar: Scholar; status: ScholarStatus } | null>(null);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     let list = [...scholars];
@@ -131,6 +140,27 @@ export default function ScholarsClient({ initialScholars }: Props) {
     setDeleteTarget(null);
   }
 
+  async function handleProgramStatusChange() {
+    if (!statusTarget) return;
+    setUpdatingStatus(true);
+    setStatusError(null);
+    const result = await updateScholarProgramStatus(statusTarget.scholar.id, statusTarget.status);
+    setUpdatingStatus(false);
+    if (result.error) {
+      setStatusError(result.error);
+      return;
+    }
+    if (result.beneficiaryId) {
+      setScholars((previous) => previous.filter((scholar) => scholar.id !== statusTarget.scholar.id));
+      setDetailTarget(null);
+      setStatusTarget(null);
+      return;
+    }
+    setScholars((previous) => previous.map((scholar) => scholar.id === statusTarget.scholar.id ? { ...scholar, status: statusTarget.status } : scholar));
+    setDetailTarget((previous) => previous?.id === statusTarget.scholar.id ? { ...previous, status: statusTarget.status } : previous);
+    setStatusTarget(null);
+  }
+
   return (
     <main className="flex-1 p-6 lg:p-8 space-y-6">
       {/* Header */}
@@ -172,6 +202,8 @@ export default function ScholarsClient({ initialScholars }: Props) {
             <SelectItem value="active">Active</SelectItem>
             <SelectItem value="completed">Completed</SelectItem>
             <SelectItem value="deferred">Deferred</SelectItem>
+            <SelectItem value="archived">Archived</SelectItem>
+            <SelectItem value="withdrawn">Removed from program</SelectItem>
           </SelectContent>
         </Select>
         <Select value={gradeFilter} onValueChange={setGradeFilter}>
@@ -322,6 +354,21 @@ export default function ScholarsClient({ initialScholars }: Props) {
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
+                          {scholar.status === "withdrawn" || scholar.status === "archived" ? (
+                            <DropdownMenuItem onClick={() => { setStatusError(null); setStatusTarget({ scholar, status: "active" }); }}>
+                              <RotateCcw className="mr-2 h-4 w-4" /> Restore to active
+                            </DropdownMenuItem>
+                          ) : (
+                            <>
+                              <DropdownMenuItem onClick={() => { setStatusError(null); setStatusTarget({ scholar, status: "archived" }); }}>
+                                <Archive className="mr-2 h-4 w-4" /> Archive to Past Beneficiaries
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => { setStatusError(null); setStatusTarget({ scholar, status: "withdrawn" }); }}>
+                                <UserRoundX className="mr-2 h-4 w-4" /> Remove from program
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                            </>
+                          )}
                           <DropdownMenuItem
                             className="text-destructive flex items-center gap-2"
                             onClick={() => setDeleteTarget(scholar)}
@@ -348,7 +395,7 @@ export default function ScholarsClient({ initialScholars }: Props) {
                   firstName={detailTarget.firstName}
                   lastName={detailTarget.lastName}
                   photoUrl={detailTarget.profilePhotoUrl}
-                  size={52}
+                  size={80}
                 />
                 <div className="min-w-0">
                   <SheetTitle className="truncate text-lg font-semibold">
@@ -381,6 +428,30 @@ export default function ScholarsClient({ initialScholars }: Props) {
           )}
         </SheetContent>
       </Sheet>
+
+      <Dialog open={!!statusTarget} onOpenChange={(open) => { if (!open && !updatingStatus) { setStatusTarget(null); setStatusError(null); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {statusTarget?.status === "archived" ? "Archive to Past Beneficiaries" : statusTarget?.status === "withdrawn" ? "Remove from program" : "Restore to active"}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {statusTarget?.status === "archived"
+              ? `${statusTarget.scholar.firstName} ${statusTarget.scholar.lastName} will move to Past Beneficiaries with their profile, documents, and activity history.`
+              : statusTarget?.status === "withdrawn"
+                ? `${statusTarget.scholar.firstName} ${statusTarget.scholar.lastName} will be marked as removed from the program. Their profile and documents will be kept.`
+                : `${statusTarget?.scholar.firstName} ${statusTarget?.scholar.lastName} will return to the active Scholars list.`}
+          </p>
+          {statusError && <p className="text-sm text-destructive">{statusError}</p>}
+          <div className="mt-2 flex justify-end gap-2">
+            <Button variant="outline" disabled={updatingStatus} onClick={() => setStatusTarget(null)}>Cancel</Button>
+            <Button variant={statusTarget?.status === "withdrawn" ? "destructive" : "default"} disabled={updatingStatus} onClick={handleProgramStatusChange}>
+              {updatingStatus ? "Saving…" : statusTarget?.status === "archived" ? "Move to Past Beneficiaries" : statusTarget?.status === "withdrawn" ? "Remove from program" : "Restore"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog

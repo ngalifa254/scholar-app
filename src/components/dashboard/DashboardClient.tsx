@@ -30,6 +30,8 @@ interface Props {
 const SCHOLAR_STATUS: Record<Exclude<ScholarStatus, "active">, { label: string; className: string }> = {
   completed: { label: "Graduated", className: "border-border text-muted-foreground" },
   deferred: { label: "On hold", className: "border-amber-300 text-amber-800" },
+  archived: { label: "Archived", className: "border-border text-muted-foreground" },
+  withdrawn: { label: "Removed", className: "border-rose-200 text-rose-800" },
 };
 
 const SELECTION_STATUSES = [

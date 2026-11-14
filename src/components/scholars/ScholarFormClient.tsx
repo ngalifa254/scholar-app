@@ -103,12 +103,12 @@ export default function ScholarFormClient({ scholar }: Props) {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="group relative w-16 h-16 rounded-full overflow-hidden bg-primary/10 flex items-center justify-center border-2 border-dashed border-primary/30 hover:border-primary/60 transition-colors shrink-0"
+                className="group relative h-24 w-24 rounded-full overflow-hidden bg-primary/10 flex items-center justify-center border-2 border-dashed border-primary/30 hover:border-primary/60 transition-colors shrink-0"
               >
                 {photoPreview ? (
-                  <Image src={photoPreview} alt="Profile" fill unoptimized className="object-cover" sizes="64px" />
+                  <Image src={photoPreview} alt="Profile" fill unoptimized className="object-cover" sizes="96px" />
                 ) : (
-                  <Camera className="w-6 h-6 text-primary/50 group-hover:text-primary/80 transition-colors" />
+                  <Camera className="h-8 w-8 text-primary/50 group-hover:text-primary/80 transition-colors" />
                 )}
                 <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <Camera className="w-4 h-4 text-white" />
@@ -174,6 +174,7 @@ export default function ScholarFormClient({ scholar }: Props) {
                     <SelectItem value="active">Active</SelectItem>
                     <SelectItem value="completed">Completed</SelectItem>
                     <SelectItem value="deferred">Deferred</SelectItem>
+                    <SelectItem value="withdrawn">Removed from program</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
